@@ -14,5 +14,5 @@ public interface Metric {
     double getWeight();
 
     // Analyze 分析代码并返回结果
-    MetricResult Analyze(ParserResult parseResult);
+    MetricResult analyze(ParserResult parseResult);
 }

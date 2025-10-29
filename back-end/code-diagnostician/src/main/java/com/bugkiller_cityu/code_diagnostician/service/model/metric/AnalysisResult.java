@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -23,8 +24,8 @@ public class AnalysisResult {
     ParserResult parseResult;                   // 解析结果
 
     // getOverallScore 获取总体评分
-    double getOverallScore(){
-        if (metricResults.isEmpty()){
+    double getOverallScore() {
+        if (metricResults.isEmpty()) {
             return 0.0;
         }
         double totalScore = 0.0, totalWeight = 0.0;
@@ -33,7 +34,7 @@ public class AnalysisResult {
             totalWeight += result.weight;
         }
 
-        if(Math.abs(totalWeight) < 1e-6) {
+        if (Math.abs(totalWeight) < 1e-6) {
             return 0.0;
         }
 
@@ -48,7 +49,17 @@ public class AnalysisResult {
         return finalScore;
     }
 
+    // AddMetricResult 添加指标结果
     void addMetricResult(String name, MetricResult result) {
         this.metricResults.put(name, result);
+    }
+
+    // GetIssues 获取所有问题
+    List<String> getIssues() {
+        List<String> issues = new LinkedList<>();
+        for(MetricResult metricResult: metricResults.values()){
+            issues.addAll(metricResult.issues);
+        }
+        return issues;
     }
 }
