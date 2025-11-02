@@ -1,7 +1,7 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.Function;
-import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParserResult;
+import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
@@ -20,8 +20,8 @@ public class AnalysisResult {
     int commentLines;                           // 注释行数
     List<String> imports;                       // 导入的包
     Map<String, MetricResult> metricResults;    // 各指标结果
-    List<Function> functions;                    // 函数列表
-    ParserResult parseResult;                   // 解析结果
+    List<Function> functions;                   // 函数列表
+    ParseResult parseResult;                   // 解析结果
 
     // getOverallScore 获取总体评分
     double getOverallScore() {

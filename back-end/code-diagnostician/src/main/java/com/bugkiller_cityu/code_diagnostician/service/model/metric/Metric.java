@@ -1,6 +1,6 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
-import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParserResult;
+import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
 
 // Metric 代码质量指标接口
 public interface Metric {
@@ -14,5 +14,5 @@ public interface Metric {
     double getWeight();
 
     // Analyze 分析代码并返回结果
-    MetricResult analyze(ParserResult parseResult);
+    MetricResult analyze(ParseResult parseResult);
 }

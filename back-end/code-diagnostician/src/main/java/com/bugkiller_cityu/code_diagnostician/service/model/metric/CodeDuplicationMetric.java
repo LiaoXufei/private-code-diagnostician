@@ -1,11 +1,7 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
-import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParserResult;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.ToString;
-import lombok.Value;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
@@ -13,15 +9,15 @@ import java.util.Map;
 @Data
 @ToString
 // CodeDuplicationMetric 评估代码重复度
-public class CodeDuplicationMetric {
-    String name;
-    String description;
-    double weight;
+public class CodeDuplicationMetric extends BaseMetric {
 
     public CodeDuplicationMetric() {
-        this.name = "代码重复度";
-        this.description = "评估代码中重复逻辑的比例，重复代码越多，越需要抽象和重构";
-        this.weight = 0.15;
+        super(
+                "代码重复度",
+                "评估代码中重复逻辑的比例，重复代码越多，越需要抽象和重构",
+                0.15
+        );
+
     }
 
     /**
@@ -69,10 +65,7 @@ public class CodeDuplicationMetric {
         double score = baseScore + (duplicationRate * increasePerPercent);
 
         // 限制范围
-        if (score > 1.0) {
-            return 1.0;
-        }
-        return score;
+        return Math.min(score, 1.0);
     }
 
 }
