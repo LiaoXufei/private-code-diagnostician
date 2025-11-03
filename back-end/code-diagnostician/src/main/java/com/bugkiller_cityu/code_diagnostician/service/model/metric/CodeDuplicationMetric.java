@@ -1,12 +1,15 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString;
 
 import java.util.List;
 import java.util.Map;
 
-@Data
+@Getter
+@Setter
 @ToString
 // CodeDuplicationMetric 评估代码重复度
 public class CodeDuplicationMetric extends BaseMetric {
