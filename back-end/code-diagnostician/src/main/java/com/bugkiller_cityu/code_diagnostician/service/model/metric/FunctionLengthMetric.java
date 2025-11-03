@@ -3,6 +3,8 @@ package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.Function;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString;
 import org.eclipse.jdt.core.dom.*;
 
@@ -13,7 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-@Data
+@Getter
+@Setter
 @ToString
 public class FunctionLengthMetric extends BaseMetric implements Metric{
     public FunctionLengthMetric() {

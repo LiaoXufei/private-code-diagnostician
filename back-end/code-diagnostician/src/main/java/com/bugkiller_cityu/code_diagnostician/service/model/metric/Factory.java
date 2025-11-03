@@ -9,7 +9,6 @@ import java.util.List;
 
 @Component
 @NoArgsConstructor
-@AllArgsConstructor
 public class Factory {
     public List<Metric> createAllMetrics() {
         return new LinkedList<>() {
