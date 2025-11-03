@@ -12,7 +12,7 @@ import java.util.List;
 @AllArgsConstructor
 public class Factory {
     public List<Metric> createAllMetrics() {
-        return new LinkedList<Metric>(){
+        return new LinkedList<>() {
             {
                 add(createFunctionLength());
             }
