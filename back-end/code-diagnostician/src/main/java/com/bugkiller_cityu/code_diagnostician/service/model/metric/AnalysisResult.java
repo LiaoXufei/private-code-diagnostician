@@ -50,7 +50,7 @@ public class AnalysisResult {
     }
 
     // AddMetricResult 添加指标结果
-    void addMetricResult(String name, MetricResult result) {
+    public void addMetricResult(String name, MetricResult result) {
         this.metricResults.put(name, result);
     }
 
