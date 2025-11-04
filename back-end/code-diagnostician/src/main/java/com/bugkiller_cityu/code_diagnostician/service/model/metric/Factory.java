@@ -14,6 +14,7 @@ public class Factory {
         return new LinkedList<>() {
             {
                 add(createFunctionLength());
+                add(createNamingConventionMetric());
             }
         };
     }
@@ -21,5 +22,8 @@ public class Factory {
     public Metric createFunctionLength(){
         return new FunctionLengthMetric();
     }
-
+    public Metric createNamingConventionMetric(){
+        return new NamingConventionMetric();
+    }
 }
+
