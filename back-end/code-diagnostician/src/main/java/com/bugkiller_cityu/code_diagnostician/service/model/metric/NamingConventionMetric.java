@@ -6,122 +6,111 @@ import org.eclipse.jdt.core.dom.*;
 import java.util.ArrayList;
 import java.util.List;
 
-
-
+/**
+ * 命名规范度量指标 (Java 版)
+ * 对类名、方法名、变量名、常量名、包名进行检查
+ */
 public class NamingConventionMetric extends BaseMetric implements Metric {
+
     public NamingConventionMetric() {
-        super("命名规范", "检查包名、类名、方法名、变量名、常量名是否符合规范", 0.08);
+        super("命名规范",
+                "检查Java代码的命名是否符合规范，包括包名、变量名、方法名、类型名等",
+                0.08);
     }
+
     @Override
     public MetricResult analyze(ParseResult parseResult) {
         JavaASTInfo astInfo = JavaASTExtractor.extractJavaAST(parseResult);
-
         if (astInfo == null || astInfo.getCompilationUnit() == null) {
             return new MetricResult(0.0, new ArrayList<>(), getDescription(), getWeight());
         }
 
         CompilationUnit cu = astInfo.getCompilationUnit();
         List<String> issues = new ArrayList<>();
+        final int[] totalNames = {0};
+        final int[] badNames = {0};
 
-        // === 包名检测 ===
+        // 包名检查
         PackageDeclaration pkg = cu.getPackage();
-        int total = 0;
-        int bad = 0;
-
         if (pkg != null) {
+            totalNames[0]++;
             String pkgName = pkg.getName().getFullyQualifiedName();
-            total++;
             if (!NamingRules.isValidPackageName(pkgName)) {
-                issues.add(String.format("包名 '%s' 不符合规范，应为小写字母且不包含下划线", pkgName));
-                bad++;
+                issues.add(String.format("包名 '%s' 不符合规范，应使用小写字母且不包含下划线。", pkgName));
+                badNames[0]++;
             }
         }
 
-        // === AST 遍历 ===
+        // 遍历AST中类、方法、变量、常量声明
         cu.accept(new ASTVisitor() {
             @Override
             public boolean visit(TypeDeclaration node) {
+                totalNames[0]++;
                 String name = node.getName().getIdentifier();
-                synchronized (issues) {
-                    totalCount[0]++;
-                    if (!NamingRules.isValidTypeName(name)) {
-                        issues.add(String.format("类型名 '%s' 不符合规范（应为PascalCase）", name));
-                        badCount[0]++;
-                    }
-                }
-                return super.visit(node);
-            }
-
-            @Override
-            public boolean visit(EnumDeclaration node) {
-                String name = node.getName().getIdentifier();
-                synchronized (issues) {
-                    totalCount[0]++;
-                    if (!NamingRules.isValidTypeName(name)) {
-                        issues.add(String.format("枚举名 '%s' 不符合规范（应为PascalCase）", name));
-                        badCount[0]++;
-                    }
+                if (!NamingRules.isValidTypeName(name)) {
+                    issues.add(String.format("类型名 '%s' 不符合规范，应使用帕斯卡命名法。", name));
+                    badNames[0]++;
                 }
                 return super.visit(node);
             }
 
             @Override
             public boolean visit(MethodDeclaration node) {
+                totalNames[0]++;
                 String name = node.getName().getIdentifier();
-                synchronized (issues) {
-                    totalCount[0]++;
-                    if (!NamingRules.isValidMethodName(name)) {
-                        issues.add(String.format("方法名 '%s' 不符合规范（应为camelCase）", name));
-                        badCount[0]++;
-                    }
+                if (!NamingRules.isValidFuncName(name)) {
+                    issues.add(String.format("方法名 '%s' 不符合规范，应使用驼峰命名法。", name));
+                    badNames[0]++;
                 }
                 return super.visit(node);
             }
 
             @Override
             public boolean visit(VariableDeclarationFragment node) {
+                totalNames[0]++;
                 String name = node.getName().getIdentifier();
-                synchronized (issues) {
-                    totalCount[0]++;
-                    // 判断是否为常量
-                    boolean isConst = false;
-                    if (node.getParent() instanceof FieldDeclaration fd) {
-                        int modifiers = fd.getModifiers();
-                        isConst = Modifier.isStatic(modifiers) && Modifier.isFinal(modifiers);
-                    }
 
-                    if (isConst) {
-                        if (!NamingRules.isValidConstName(name)) {
-                            issues.add(String.format("常量名 '%s' 不符合规范（应为UPPER_SNAKE_CASE）", name));
-                            badCount[0]++;
-                        }
-                    } else {
-                        if (!NamingRules.isValidVariableName(name)) {
-                            issues.add(String.format("变量名 '%s' 不符合规范（应为camelCase或小写）", name));
-                            badCount[0]++;
-                        }
+                if (isConstant(node)) {
+                    if (!NamingRules.isValidConstName(name)) {
+                        issues.add(String.format("常量名 '%s' 不符合规范，应使用全大写加下划线或帕斯卡命名法。", name));
+                        badNames[0]++;
+                    }
+                } else {
+                    if (!NamingRules.isValidVarName(name)) {
+                        issues.add(String.format("变量名 '%s' 不符合规范，应使用小驼峰或小写命名。", name));
+                        badNames[0]++;
                     }
                 }
                 return super.visit(node);
             }
+
+            private boolean isConstant(VariableDeclarationFragment node) {
+                ASTNode parent = node.getParent();
+                if (parent instanceof FieldDeclaration) {
+                    FieldDeclaration field = (FieldDeclaration) parent;
+                    int modifiers = field.getModifiers();
+                    return Modifier.isStatic(modifiers) && Modifier.isFinal(modifiers);
+                }
+                return false;
+            }
         });
 
-        double score = computeScore(totalCount[0], badCount[0]);
+        double score;
+        if (totalNames[0] == 0) {
+            score = 0.0;
+        } else {
+            double badRatio = (double) badNames[0] / totalNames[0];
+            score = calculateScore(badRatio);
+        }
+
         return new MetricResult(score, issues, getDescription(), getWeight());
     }
 
-    /**
-     * 根据不良比例计算得分（越低越差）
-     */
-    private double computeScore(int total, int bad) {
-        if (total == 0) return 0.0;
-        double ratio = (double) bad / total;
-        double score = 1.0 - ratio;
-        if (score < 0) score = 0;
-        return Math.round(score * 100.0) / 100.0;
+    // 计分规则：基础分 0.4，每1%不良命名增加0.1分，最高1.0
+    private double calculateScore(double badRatio) {
+        double baseScore = 0.4;
+        double increase = badRatio * 10.0;
+        double score = baseScore + increase;
+        return Math.min(score, 1.0);
     }
-
-    // 使用内部字段记录计数（为AST匿名内部类服务）
-    private final int[] totalCount = {0};
-    private final int[] badCount = {0};
 }

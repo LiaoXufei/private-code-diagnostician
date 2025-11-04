@@ -1,5 +1,7 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
+
+
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -15,6 +17,7 @@ public class Factory {
             {
                 add(createFunctionLength());
                 add(createNamingConventionMetric());
+                add(createCommentCoverageMetric());
             }
         };
     }
@@ -24,6 +27,9 @@ public class Factory {
     }
     public Metric createNamingConventionMetric(){
         return new NamingConventionMetric();
+    }
+    public Metric createCommentCoverageMetric(){
+        return new CommentCoverageMetric();
     }
 }
 
