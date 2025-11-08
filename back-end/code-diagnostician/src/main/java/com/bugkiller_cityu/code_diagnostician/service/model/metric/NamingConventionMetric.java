@@ -12,29 +12,32 @@ import java.util.List;
  * 功能：分析Java代码的包名、类名、方法名、变量名、常量名的命名规范性。
  */
 public class NamingConventionMetric extends BaseMetric implements Metric {
-
+    private int totalNames;
+    private int badNames;
     public NamingConventionMetric() {
         super(
                 "命名规范",
                 "检查Java代码中的命名是否符合规范，包括包名、变量名、方法名、类型名等",
                 0.08
         );
+        totalNames = 0;
+        badNames = 0;
     }
 
     @Override
     public MetricResult analyze(ParseResult parseResult) {
-        // 1️ 提取 AST
+        // 1 提取 AST
         JavaASTInfo astInfo = JavaASTExtractor.extractJavaAST(parseResult);
         if (astInfo == null) {
             return new MetricResult(0.0, new ArrayList<>(), this.getDescription(), this.getWeight());
         }
 
-        // 2️ 确保内容存在
+        // 2 确保内容存在
         if (astInfo.getContent() == null || astInfo.getContent().length == 0) {
             astInfo.setContent("\n".repeat(Math.max(1, parseResult.getTotalLines())).getBytes(StandardCharsets.UTF_8));
         }
 
-        // 3️ 调用内部分析逻辑
+        // 3 调用内部分析逻辑
         ScoreAndIssues scoreAndIssues = analyzeNaming(astInfo, parseResult);
 
         // 4 组装 MetricResult
@@ -49,16 +52,13 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
     /**
      * 命名规范分析逻辑（主核心）
      */
-    private ScoreAndIssues analyzeNaming(JavaASTInfo astInfo, ParseResult parseResult) {
+    private ScoreAndIssues analyzeNaming(JavaASTInfo astInfo) {
         List<String> issues = new ArrayList<>();
 
         CompilationUnit cu = astInfo.getCompilationUnit();
         if (cu == null) {
             return new ScoreAndIssues(0.0, issues);
         }
-
-        int totalNames = 0;
-        int badNames = 0;
 
         // 检查包名
         PackageDeclaration pkg = cu.getPackage();
