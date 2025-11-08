@@ -18,6 +18,7 @@ public class Factory {
                 add(createFunctionLength());
                 add(createNamingConventionMetric());
                 add(createCommentCoverageMetric());
+                add(createCodeDuplicationMetric());
             }
         };
     }
@@ -30,6 +31,9 @@ public class Factory {
     }
     public Metric createCommentCoverageMetric(){
         return new CommentCoverageMetric();
+    }
+    public Metric createCodeDuplicationMetric(){
+        return new CodeDuplicationMetric();
     }
 }
 
