@@ -1,8 +1,5 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
-
-
-import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import org.springframework.stereotype.Component;
 
