@@ -38,7 +38,7 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
         }
 
         // 3 调用内部分析逻辑
-        ScoreAndIssues scoreAndIssues = analyzeNaming(astInfo, parseResult);
+        ScoreAndIssues scoreAndIssues = analyzeNaming(astInfo);
 
         // 4 组装 MetricResult
         return new MetricResult(
