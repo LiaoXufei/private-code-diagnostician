@@ -12,7 +12,7 @@ public class Factory {
     public List<Metric> createAllMetrics() {
         return new LinkedList<>() {
             {
-                add(createFunctionLength());
+                add(createFunctionLengthMetric());
                 add(createNamingConventionMetric());
                 add(createCommentCoverageMetric());
                 add(createCodeDuplicationMetric());
@@ -20,7 +20,7 @@ public class Factory {
         };
     }
 
-    public Metric createFunctionLength(){
+    public Metric createFunctionLengthMetric(){
         return new FunctionLengthMetric();
     }
     public Metric createNamingConventionMetric(){
