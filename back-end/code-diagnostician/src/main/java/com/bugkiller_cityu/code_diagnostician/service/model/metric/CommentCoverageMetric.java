@@ -23,60 +23,35 @@ public class CommentCoverageMetric extends BaseMetric implements Metric {
         CompilationUnit cu = astInfo.getCompilationUnit();
         String source = new String(astInfo.getContent());
 
+        ScoreAndIssues scoreAndIssues = analyzeCommentCoverage(cu, source);
+
+        return new MetricResult(
+                scoreAndIssues.getScore(),
+                scoreAndIssues.getIssues(),
+                getDescription(),
+                getWeight()
+        );
+    }
+
+    private ScoreAndIssues analyzeCommentCoverage(CompilationUnit cu, String source) {
+        List<String> issues = new ArrayList<>();
+
         int totalLines = countTotalLines(source);
         int commentLines = countCommentLines(cu);
 
         double commentRatio = (totalLines == 0) ? 0.0 : (double) commentLines / totalLines;
         double score = calculateScore(commentRatio);
-        List<String> issues = generateIssues(cu, commentRatio);
 
-        return new MetricResult(score, issues, getDescription(), getWeight());
-    }
-
-    /** 统计总行数 */
-    private int countTotalLines(String source) {
-        return (int) source.lines().count();
-    }
-
-    /** 统计注释行数 */
-    private int countCommentLines(CompilationUnit cu) {
-        List<Comment> comments = cu.getCommentList();
-        Set<Integer> commentLines = new HashSet<>();
-
-        for (Comment c : comments) {
-            int startLine = cu.getLineNumber(c.getStartPosition());
-            int endLine = cu.getLineNumber(c.getStartPosition() + c.getLength());
-            for (int i = startLine; i <= endLine; i++) {
-                commentLines.add(i);
-            }
-        }
-        return commentLines.size();
-    }
-
-    /** 按 Go 版计分机制计算分数 */
-    private double calculateScore(double ratio) {
-        double baseScore = 0.9;              // 基础分
-        double reducePerPercent = 0.05;      // 每1%注释，减0.05分
-        double percent = ratio * 100;        // 转换为百分比
-
-        double score = baseScore - (percent * reducePerPercent);
-        if (score < 0.0) score = 0.0;
-        return score;
-    }
-
-    /** 生成报告 */
-    private List<String> generateIssues(CompilationUnit cu, double ratio) {
-        List<String> issues = new ArrayList<>();
-
-        if (ratio < 0.05) {
-            issues.add(String.format("注释覆盖率极低（%.2f%%），可读性较差。", ratio * 100));
-        } else if (ratio < 0.10) {
-            issues.add(String.format("注释覆盖率偏低（%.2f%%），建议增加必要注释。", ratio * 100));
-        } else if (ratio > 0.40) {
-            issues.add(String.format("注释覆盖率较高（%.2f%%），可能存在冗余注释。", ratio * 100));
+        // 生成基本注释覆盖率问题
+        if (commentRatio < 0.05) {
+            issues.add(String.format("注释覆盖率极低（%.2f%%），可读性较差。", commentRatio * 100));
+        } else if (commentRatio < 0.10) {
+            issues.add(String.format("注释覆盖率偏低（%.2f%%），建议增加必要注释。", commentRatio * 100));
+        } else if (commentRatio > 0.40) {
+            issues.add(String.format("注释覆盖率较高（%.2f%%），可能存在冗余注释。", commentRatio * 100));
         }
 
-        // 检查 public 类与方法的文档注释
+        // 检查公共类与方法文档注释
         cu.accept(new ASTVisitor() {
             @Override
             public boolean visit(TypeDeclaration node) {
@@ -95,7 +70,35 @@ public class CommentCoverageMetric extends BaseMetric implements Metric {
             }
         });
 
-        return issues;
+        return new ScoreAndIssues(score, issues);
+    }
+
+    private int countTotalLines(String source) {
+        return (int) source.lines().count();
+    }
+
+    private int countCommentLines(CompilationUnit cu) {
+        List<Comment> comments = cu.getCommentList();
+        Set<Integer> commentLines = new HashSet<>();
+        for (Comment c : comments) {
+            int startLine = cu.getLineNumber(c.getStartPosition());
+            int endLine = cu.getLineNumber(c.getStartPosition() + c.getLength());
+            for (int i = startLine; i <= endLine; i++) {
+                commentLines.add(i);
+            }
+        }
+        return commentLines.size();
+    }
+
+    private double calculateScore(double ratio) {
+        //  Go 版计分机制
+        double baseScore = 0.9;
+        double reducePerPercent = 0.05;
+        double percent = ratio * 100;
+        double score = baseScore - (percent * reducePerPercent);
+        if (score < 0.0) score = 0.0;
+        return score;
     }
 }
+
 
