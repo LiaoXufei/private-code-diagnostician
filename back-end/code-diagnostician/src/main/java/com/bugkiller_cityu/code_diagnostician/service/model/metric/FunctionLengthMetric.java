@@ -2,7 +2,6 @@ package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.Function;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
-import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -140,7 +139,7 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
     }
 
     private ScoreAndIssues analyzeStateManagement(CompilationUnit cu) {
-        ScoreAndIssues scoreAndIssues = new ScoreAndIssues(0, new ArrayList<String>());
+        ScoreAndIssues scoreAndIssues = new ScoreAndIssues(0, new ArrayList<>());
         int globalVars = 0;
         AtomicInteger mutableVars = new AtomicInteger(0);
         AtomicInteger totalVars = new AtomicInteger(0);

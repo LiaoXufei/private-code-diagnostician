@@ -34,12 +34,12 @@ class FunctionLengthMetricTest {
         String code = """
             public class Demo {
                 int globalCount = 0;
-                
+               
                 void increase() {
                     globalCount++;
                 }
             }
-            """;
+           """;
 
         // 构建 AST
         CompilationUnit cu = parse(code);
