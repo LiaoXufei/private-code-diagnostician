@@ -140,7 +140,7 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
     }
 
     private ScoreAndIssues analyzeStateManagement(CompilationUnit cu) {
-        ScoreAndIssues scoreAndIssues = new ScoreAndIssues();
+        ScoreAndIssues scoreAndIssues = new ScoreAndIssues(0, new ArrayList<String>());
         int globalVars = 0;
         AtomicInteger mutableVars = new AtomicInteger(0);
         AtomicInteger totalVars = new AtomicInteger(0);
