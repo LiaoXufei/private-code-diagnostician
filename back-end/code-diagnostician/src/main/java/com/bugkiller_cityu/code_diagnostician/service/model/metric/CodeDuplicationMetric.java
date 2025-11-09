@@ -30,7 +30,12 @@ public class CodeDuplicationMetric extends BaseMetric implements Metric{
         JavaASTInfo javaASTInfo = JavaASTExtractor.extractJavaAST(parseResult);
         List<String> issues = new ArrayList<>();
         if (javaASTInfo == null){
-            new ScoreAndIssues(0.35, issues);
+            return new MetricResult(
+                    0.35,
+                    issues,
+                    this.getDescription(),
+                    this.getWeight()
+            );
         }
         Map<String, List<String>> similarFunctions = new HashMap<>();
         int totalFunctions = 0;
