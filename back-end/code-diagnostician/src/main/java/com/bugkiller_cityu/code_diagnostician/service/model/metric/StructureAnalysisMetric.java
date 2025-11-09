@@ -112,37 +112,39 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
             if (!(obj instanceof Statement)) continue;
             Statement stmt = (Statement) obj;
 
-            if (stmt instanceof IfStatement) {
-                IfStatement ifStmt = (IfStatement) stmt;
-                inspectBlock(extractBlock(ifStmt.getThenStatement()), currentDepth + 1, maxDepth);
-                Statement elseStmt = ifStmt.getElseStatement();
-                if (elseStmt != null) {
-                    if (elseStmt instanceof Block) {
-                        inspectBlock((Block) elseStmt, currentDepth + 1, maxDepth);
-                    } else if (elseStmt instanceof IfStatement) {
-                        // 递归处理 else-if
-                        inspectBlock(extractBlock(((IfStatement) elseStmt).getThenStatement()), currentDepth + 1, maxDepth);
+            switch (stmt) {
+                case IfStatement ifStmt -> {
+                    inspectBlock(extractBlock(ifStmt.getThenStatement()), currentDepth + 1, maxDepth);
+                    Statement elseStmt = ifStmt.getElseStatement();
+                    if (elseStmt != null) {
+                        if (elseStmt instanceof Block) {
+                            inspectBlock((Block) elseStmt, currentDepth + 1, maxDepth);
+                        } else if (elseStmt instanceof IfStatement) {
+                            // 递归处理 else-if
+                            inspectBlock(extractBlock(((IfStatement) elseStmt).getThenStatement()), currentDepth + 1, maxDepth);
+                        }
                     }
                 }
-            } else if (stmt instanceof ForStatement) {
-                inspectBlock(extractBlock(((ForStatement) stmt).getBody()), currentDepth + 1, maxDepth);
-            } else if (stmt instanceof EnhancedForStatement) {
-                inspectBlock(extractBlock(((EnhancedForStatement) stmt).getBody()), currentDepth + 1, maxDepth);
-            } else if (stmt instanceof WhileStatement) {
-                inspectBlock(extractBlock(((WhileStatement) stmt).getBody()), currentDepth + 1, maxDepth);
-            } else if (stmt instanceof DoStatement) {
-                inspectBlock(extractBlock(((DoStatement) stmt).getBody()), currentDepth + 1, maxDepth);
-            } else if (stmt instanceof SwitchStatement) {
-                SwitchStatement switchStmt = (SwitchStatement) stmt;
-                for (Object o : switchStmt.statements()) {
-                    if (o instanceof Block) {
-                        inspectBlock((Block) o, currentDepth + 1, maxDepth);
+                case ForStatement forStatement ->
+                        inspectBlock(extractBlock(forStatement.getBody()), currentDepth + 1, maxDepth);
+                case EnhancedForStatement enhancedForStatement ->
+                        inspectBlock(extractBlock(enhancedForStatement.getBody()), currentDepth + 1, maxDepth);
+                case WhileStatement whileStatement ->
+                        inspectBlock(extractBlock(whileStatement.getBody()), currentDepth + 1, maxDepth);
+                case DoStatement doStatement ->
+                        inspectBlock(extractBlock(doStatement.getBody()), currentDepth + 1, maxDepth);
+                case SwitchStatement switchStmt -> {
+                    for (Object o : switchStmt.statements()) {
+                        if (o instanceof Block) {
+                            inspectBlock((Block) o, currentDepth + 1, maxDepth);
+                        }
                     }
                 }
-            } else if (stmt instanceof SynchronizedStatement) {
-                inspectBlock(((SynchronizedStatement) stmt).getBody(), currentDepth + 1, maxDepth);
-            } else if (stmt instanceof Block) {
-                inspectBlock((Block) stmt, currentDepth + 1, maxDepth);
+                case SynchronizedStatement synchronizedStatement ->
+                        inspectBlock(synchronizedStatement.getBody(), currentDepth + 1, maxDepth);
+                case Block block1 -> inspectBlock(block1, currentDepth + 1, maxDepth);
+                default -> {
+                }
             }
         }
     }
