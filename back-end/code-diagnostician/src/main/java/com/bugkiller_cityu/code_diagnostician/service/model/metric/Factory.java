@@ -17,6 +17,8 @@ public class Factory {
                 add(createCommentCoverageMetric());
                 add(createCodeDuplicationMetric());
                 add(createStructureAnalysisMetric());
+                add(createCyclomaticComplexityMetric());
+                add(createErrorHandlingMetric());
             }
         };
     }
@@ -36,5 +38,12 @@ public class Factory {
     public Metric createStructureAnalysisMetric(){
         return new StructureAnalysisMetric();
     }
+    public Metric createCyclomaticComplexityMetric(){
+        return new CyclomaticComplexityMetric();
+    }
+    public Metric createErrorHandlingMetric(){
+        return new ErrorHandlingMetric();
+    }
+
 }
 
