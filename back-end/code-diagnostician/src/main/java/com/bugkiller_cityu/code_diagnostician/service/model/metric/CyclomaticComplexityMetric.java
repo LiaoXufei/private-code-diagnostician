@@ -149,14 +149,16 @@ public class CyclomaticComplexityMetric extends BaseMetric implements Metric {
     }
 
     /**
-     * 根据平均复杂度计算得分
-     * 越复杂得分越高（越差）
+     * 根据平均复杂度计算得分（线性映射 —— 与 Go 版本一致的公式）
+     * score = baseScore + avgComplexity * increasePerLevel
+     * capped to 1.0
      */
     private double calculateComplexityScore(double avgComplexity) {
-        if (avgComplexity <= 5) return 0.2;
-        if (avgComplexity <= 10) return 0.4;
-        if (avgComplexity <= 15) return 0.6;
-        if (avgComplexity <= 20) return 0.8;
-        return 1.0;
+        double baseScore = 0.4;
+        double increasePerLevel = 0.1;
+
+        double score = baseScore + (avgComplexity * increasePerLevel);
+        return Math.min(score, 1.0);
     }
 }
+
