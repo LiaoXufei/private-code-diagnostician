@@ -5,14 +5,9 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class CodeDuplicationMetricTest {
+class CodeDuplicationMetricTest extends BasicMetricTest{
     private MethodDeclaration parseMethod(String code) {
-        ASTParser parser = ASTParser.newParser(AST.JLS21);
-        parser.setKind(ASTParser.K_COMPILATION_UNIT);
-        parser.setSource(code.toCharArray());
-        parser.setResolveBindings(false);
-
-        CompilationUnit cu = (CompilationUnit) parser.createAST(null);
+        CompilationUnit cu = parse(code);
         TypeDeclaration typeDecl = (TypeDeclaration) cu.types().get(0);
         return typeDecl.getMethods()[0];
     }

@@ -7,14 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class FunctionLengthMetricTest {
-    private static CompilationUnit parse(String code) {
-        ASTParser parser = ASTParser.newParser(AST.JLS21);
-        parser.setKind(ASTParser.K_COMPILATION_UNIT);
-        parser.setSource(code.toCharArray());
-        parser.setResolveBindings(true);
-        return (CompilationUnit) parser.createAST(null);
-    }
+class FunctionLengthMetricTest extends BasicMetricTest{
 
     private static ScoreAndIssues invokeAnalyze(CompilationUnit cu) {
         try {

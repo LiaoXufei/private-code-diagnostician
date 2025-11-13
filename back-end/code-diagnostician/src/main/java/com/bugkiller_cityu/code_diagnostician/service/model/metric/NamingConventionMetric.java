@@ -37,8 +37,9 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
             astInfo.setContent("\n".repeat(Math.max(1, parseResult.getTotalLines())).getBytes(StandardCharsets.UTF_8));
         }
 
+        CompilationUnit cu = astInfo.getCompilationUnit();
         // 3 调用内部分析逻辑
-        ScoreAndIssues scoreAndIssues = analyzeNaming(astInfo);
+        ScoreAndIssues scoreAndIssues = analyzeNaming(cu);
 
         // 4 组装 MetricResult
         return new MetricResult(
@@ -52,10 +53,9 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
     /**
      * 命名规范分析逻辑（主核心）
      */
-    private ScoreAndIssues analyzeNaming(JavaASTInfo astInfo) {
+    private ScoreAndIssues analyzeNaming(CompilationUnit cu) {
         List<String> issues = new ArrayList<>();
 
-        CompilationUnit cu = astInfo.getCompilationUnit();
         if (cu == null) {
             return new ScoreAndIssues(0.0, issues);
         }

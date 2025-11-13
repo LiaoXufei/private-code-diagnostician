@@ -11,18 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * ErrorHandlingMetric 测试类
  * 模拟不同的异常处理场景，验证分析逻辑与得分计算。
  */
-class ErrorHandlingMetricTest {
-
-    /**
-     * 将 Java 源码解析为 CompilationUnit
-     */
-    private static CompilationUnit parse(String code) {
-        ASTParser parser = ASTParser.newParser(AST.JLS21);
-        parser.setKind(ASTParser.K_COMPILATION_UNIT);
-        parser.setSource(code.toCharArray());
-        parser.setResolveBindings(true);
-        return (CompilationUnit) parser.createAST(null);
-    }
+class ErrorHandlingMetricTest extends BasicMetricTest {
 
     /**
      * 反射调用私有方法 analyzeErrorHandling
@@ -44,16 +33,16 @@ class ErrorHandlingMetricTest {
     @Test
     void testIgnoredCatchVariable() {
         String code = """
-            public class Demo {
-                void risky() {
-                    try {
-                        int x = 10 / 0;
-                    } catch (Exception e) {
-                        // 未使用异常变量
+                public class Demo {
+                    void risky() {
+                        try {
+                            int x = 10 / 0;
+                        } catch (Exception e) {
+                            // 未使用异常变量
+                        }
                     }
                 }
-            }
-            """;
+                """;
 
         CompilationUnit cu = parse(code);
         ScoreAndIssues result = invokeAnalyze(cu);
@@ -72,13 +61,13 @@ class ErrorHandlingMetricTest {
     @Test
     void testThrowsExceptionDeclaration() {
         String code = """
-            import java.io.IOException;
-            public class FileDemo {
-                void readFile() throws IOException {
-                    throw new IOException("Error");
+                import java.io.IOException;
+                public class FileDemo {
+                    void readFile() throws IOException {
+                        throw new IOException("Error");
+                    }
                 }
-            }
-            """;
+                """;
 
         CompilationUnit cu = parse(code);
         ScoreAndIssues result = invokeAnalyze(cu);
@@ -96,12 +85,12 @@ class ErrorHandlingMetricTest {
     @Test
     void testNoExceptionCode() {
         String code = """
-            public class CleanCode {
-                void hello() {
-                    int a = 10 + 20;
+                public class CleanCode {
+                    void hello() {
+                        int a = 10 + 20;
+                    }
                 }
-            }
-            """;
+                """;
 
         CompilationUnit cu = parse(code);
         ScoreAndIssues result = invokeAnalyze(cu);

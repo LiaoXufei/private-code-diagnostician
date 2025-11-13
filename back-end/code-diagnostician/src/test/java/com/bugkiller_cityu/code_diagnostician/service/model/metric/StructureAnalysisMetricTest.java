@@ -9,7 +9,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class StructureAnalysisMetricTest {
+class StructureAnalysisMetricTest extends BasicMetricTest{
 
     @Test
     void analyzeNestingDepth() {

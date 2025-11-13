@@ -30,7 +30,7 @@ public class NamingRules {
 
     // 包名规范
     public static boolean isValidPackageName(String name) {
-        return isLowerCase(name) && !name.contains("_");
+        return name.matches("^[a-z]+(\\.[a-z][a-z0-9]*)*$");
     }
 
     // 函数名规范（驼峰）

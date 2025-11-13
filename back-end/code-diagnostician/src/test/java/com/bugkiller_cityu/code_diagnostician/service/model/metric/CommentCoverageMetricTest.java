@@ -7,13 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class CommentCoverageMetricTest {
-    private CompilationUnit parse(String source) {
-        ASTParser parser = ASTParser.newParser(AST.JLS21);
-        parser.setSource(source.toCharArray());
-        parser.setKind(ASTParser.K_COMPILATION_UNIT);
-        return (CompilationUnit) parser.createAST(null);
-    }
+class CommentCoverageMetricTest extends BasicMetricTest {
 
     private static ScoreAndIssues invokeAnalyze(CompilationUnit cu, String code) {
         try {
@@ -25,6 +19,7 @@ class CommentCoverageMetricTest {
             throw new RuntimeException(e);
         }
     }
+
     @Test
     void testLowCommentCoverage() {
         String code = """
@@ -44,6 +39,7 @@ class CommentCoverageMetricTest {
         assertNotNull(result);
         assertTrue(result.getIssues().stream().anyMatch(s -> s.contains("缺少文档注释")));
     }
+
     @Test
     void testHighCommentCoverage() {
         String code = """
