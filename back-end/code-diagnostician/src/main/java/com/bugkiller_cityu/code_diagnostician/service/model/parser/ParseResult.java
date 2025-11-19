@@ -5,18 +5,18 @@ import com.bugkiller_cityu.code_diagnostician.service.model.common.LanguageType;
 import java.util.List;
 
 public interface ParseResult {
-    // getFunctions 获取解析出的所有函数
+    // getFunctions (Get all parsed functions)
     List<Function> getFunctions();
 
-    // getCommentLines 获取注释行数
+    // getCommentLines (Get the number of comment lines)
     int getCommentLines();
 
-    // getTotalLines 获取总行数
+    // getTotalLines (Get the total number of lines)
     int getTotalLines();
 
-    // getLanguage 获取语言类型
+    // getLanguage (Get language type)
     LanguageType getLanguage();
 
-    // getASTRoot 获取AST根节点(如果支持)
+    // getASTRoot (Get AST root node (if supported))
     Object getASTRoot();
 }
