@@ -15,7 +15,7 @@ public interface Parser {
      * throws: 
      *      Exception possible parsing errors
      */
-    ParserResult parse(String filePath, byte[] content) throws Exception;
+    ParseResult parse(String filePath, byte[] content) throws Exception;
     
     /**
      * Get supported language types

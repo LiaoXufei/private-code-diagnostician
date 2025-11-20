@@ -11,11 +11,11 @@ import java.util.regex.Matcher;
 public class GenericParser implements Parser {
     
     @Override
-    public ParserResult parse(String filePath, byte[] content) throws Exception {
+    public ParseResult parse(String filePath, byte[] content) throws Exception {
         String contentStr = new String(content);
         String[] lines = contentStr.split("\n");
         
-        BaseParserResult result = new BaseParserResult();
+        BaseParseResult result = new BaseParseResult();
         result.setFunctions(new ArrayList<>());
         result.setTotalLines(lines.length);
         result.setLanguage(LanguageType.UNSUPPORTED);
