@@ -105,7 +105,19 @@ export const useUploadStore = defineStore('upload', () => {
   const fetchFileTree = async (projectId) => {
     try {
       const response = await uploadApi.getFiles(projectId)
-      fileTree.value = response.data || []
+      const list = Array.isArray(response.data?.files)
+        ? response.data.files
+        : Array.isArray(response.data)
+        ? response.data
+        : []
+      fileTree.value = list.map(f => ({
+        id: f.id,
+        parentId: null,
+        type: 'file',
+        name: f.filename || f.file_name || f.name || '',
+        path: f.file_path || f.path || '',
+        size: f.file_size || f.size || 0
+      }))
       return fileTree.value
     } catch (err) {
       console.error('获取文件列表失败:', err)

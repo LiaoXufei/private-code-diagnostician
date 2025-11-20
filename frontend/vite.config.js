@@ -71,12 +71,12 @@ export default defineConfig({
     open: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:9998',
+        target: 'http://localhost:9999',
         changeOrigin: true,
         secure: false,
       },
       '/ws': {
-        target: 'ws://localhost:9998',
+        target: 'ws://localhost:9999',
         ws: true,
         changeOrigin: true,
       }
@@ -86,7 +86,7 @@ export default defineConfig({
     port: 4173,
     proxy: {
       '/api': {
-        target: 'http://localhost:9998',
+        target: 'http://localhost:9999',
         changeOrigin: true,
       }
     }

@@ -489,6 +489,30 @@ router.get('/projects/:id/files', (req, res) => {
   })
 })
 
+router.get('/projects/:id/files/content', (req, res) => {
+  const { id } = req.params
+  const filePath = req.query.path
+  if (!filePath) {
+    return res.status(400).json({ error: '缺少文件路径' })
+  }
+
+  try {
+    const uploadsDir = path.join(__dirname, '../uploads', id)
+    const filename = path.basename(filePath)
+    const absPath = path.join(uploadsDir, filename)
+
+    if (fs.existsSync(absPath) && fs.statSync(absPath).isFile()) {
+      const content = fs.readFileSync(absPath, 'utf8')
+      return res.json({ content })
+    }
+
+    return res.json({ content: '' })
+  } catch (err) {
+    console.error('读取文件内容失败:', err)
+    return res.status(500).json({ error: '读取文件内容失败' })
+  }
+})
+
 // 删除文件
 router.delete('/projects/:id/files/:fileId', (req, res) => {
   const db = req.db
@@ -545,15 +569,17 @@ router.delete('/projects/:id/files/:fileId', (req, res) => {
 
                 // 删除物理文件
                 try {
-                  if (fs.existsSync(file.file_path)) {
-                    fs.unlinkSync(file.file_path)
-                    console.log('🗑️ 删除物理文件:', file.file_path)
+                  const uploadsDir = path.join(__dirname, '../uploads', id)
+                  const filename = path.basename(file.file_path || '')
+                  const absPath = path.join(uploadsDir, filename)
+                  if (fs.existsSync(absPath)) {
+                    fs.unlinkSync(absPath)
+                    console.log('🗑️ 删除物理文件:', absPath)
                   } else {
-                    console.log('📁 物理文件不存在，跳过删除:', file.file_path)
+                    console.log('📁 物理文件不存在，跳过删除:', absPath)
                   }
                 } catch (fileErr) {
                   console.error('删除物理文件失败:', fileErr)
-                  // 物理文件删除失败不影响数据库操作，但记录错误
                 }
 
                 console.log('🗑️ 删除文件记录:', fileId, file.filename)

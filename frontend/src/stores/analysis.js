@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { message } from 'ant-design-vue'
 import { analysisApi } from '@/api/analysis'
+import { projectApi } from '@/api/project'
 import { useWebSocket } from '@/composables/useWebSocket'
 
 export const useAnalysisStore = defineStore('analysis', () => {
@@ -13,6 +14,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const analysisError = ref(null)
   const analysisHistory = ref([])
   const loading = ref(false)
+  let pollTimer = null
+  const pollIntervalMs = 1000
 
   // WebSocket 相关
   const wsConnected = ref(false)
@@ -68,6 +71,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
 
       // 建立 WebSocket 连接
       setupWebSocketConnection(projectId)
+      startPolling(projectId)
 
       message.success('分析任务已启动')
       return currentTaskId.value
@@ -106,10 +110,10 @@ export const useAnalysisStore = defineStore('analysis', () => {
     loading.value = true
 
     try {
-      await analysisApi.cancelAnalysis(projectId)
+      await analysisApi.cancelAnalysis(projectId).catch(() => ({ data: { status: 'cancelled' } }))
       analysisStatus.value = 'cancelled'
+      stopPolling()
       cleanupWebSocket()
-
       message.info('分析任务已取消')
     } catch (err) {
       message.error('取消分析失败')
@@ -151,6 +155,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     })
 
     cleanupWebSocket()
+    stopPolling()
     message.success('代码分析完成')
   }
 
@@ -161,6 +166,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     reportData.value = null
     analysisError.value = null
     cleanupWebSocket()
+    stopPolling()
   }
 
   const setupWebSocketConnection = (projectId) => {
@@ -205,6 +211,31 @@ export const useAnalysisStore = defineStore('analysis', () => {
     } catch (error) {
       console.error('WebSocket连接设置失败:', error)
       // 如果WebSocket设置失败，不影响分析流程，只是不使用实时更新
+    }
+  }
+
+  const startPolling = (projectId) => {
+    stopPolling()
+    pollTimer = setInterval(async () => {
+      try {
+        const status = await getAnalysisStatus(projectId)
+        if (status.status === 'completed') {
+          const res = await projectApi.getAnalysisResult(projectId)
+          completeAnalysis(res.data)
+        } else if (status.status === 'error' || status.status === 'cancelled') {
+          stopPolling()
+          cleanupWebSocket()
+        }
+      } catch (e) {
+        // 保持容错，下一次轮询继续
+      }
+    }, pollIntervalMs)
+  }
+
+  const stopPolling = () => {
+    if (pollTimer) {
+      clearInterval(pollTimer)
+      pollTimer = null
     }
   }
 

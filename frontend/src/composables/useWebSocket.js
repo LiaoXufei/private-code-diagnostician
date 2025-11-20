@@ -1,4 +1,4 @@
-import { ref, onUnmounted } from 'vue'
+import { ref, onUnmounted, readonly } from 'vue'
 
 export class WebSocketManager {
   constructor(url) {
@@ -155,7 +155,8 @@ export function useWebSocket(projectId) {
   const isConnected = ref(false)
 
   const connect = () => {
-    const wsUrl = `${import.meta.env.VITE_WS_BASE_URL}/analysis/${projectId}`
+    const base = import.meta.env.VITE_WS_BASE_URL || `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`
+    const wsUrl = `${base}/analysis/${projectId}`
     wsManager.value = new WebSocketManager(wsUrl)
     wsManager.value.connect()
 
