@@ -7,12 +7,12 @@ import lombok.ToString;
 @Data
 @NoArgsConstructor
 @ToString
-// Function 函数信息
+// Function Information
 public class Function {
-    String name;        // 函数名
-    int startLine;      // 开始行
-    int endLine;        // 结束行
-    int complexity;     // 复杂度
-    int parameters;     // 参数数量
-    Object node;        // AST节点(可选)
+    String name;        // Function Name
+    int startLine;      // Start Line
+    int endLine;        // End Line
+    int complexity;     // Complexity
+    int parameters;     // Number of Parameters
+    Object node;        // AST node (optional)
 }
