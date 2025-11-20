@@ -24,7 +24,7 @@ public class AnalysisResult {
     ParseResult parseResult;                   // 解析结果
 
     // getOverallScore 获取总体评分
-    double getOverallScore() {
+    public double getOverallScore() {
         if (metricResults.isEmpty()) {
             return 0.0;
         }
@@ -55,7 +55,7 @@ public class AnalysisResult {
     }
 
     // GetIssues 获取所有问题
-    List<String> getIssues() {
+    public List<String> getIssues() {
         List<String> issues = new LinkedList<>();
         for(MetricResult metricResult: metricResults.values()){
             issues.addAll(metricResult.issues);
