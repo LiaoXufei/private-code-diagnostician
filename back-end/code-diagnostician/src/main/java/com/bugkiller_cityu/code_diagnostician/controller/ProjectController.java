@@ -1,5 +1,9 @@
 package com.bugkiller_cityu.code_diagnostician.controller;
 
+import com.bugkiller_cityu.code_diagnostician.entity.*;
+import com.bugkiller_cityu.code_diagnostician.repository.*;
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -16,491 +20,635 @@ import java.util.stream.Collectors;
 @CrossOrigin
 @RestController
 @RequestMapping("/api")
+@RequiredArgsConstructor
 public class ProjectController {
-    private final Map<String, Map<String, Object>> projects = new LinkedHashMap<>();
-    private final Map<String, List<Map<String, Object>>> filesByProject = new HashMap<>();
-    private final Map<String, List<Map<String, Object>>> analysesByProject = new HashMap<>();
+    private final ProjectRepository projectRepository;
+    private final ProjectFileRepository fileRepository;
+    private final AnalysisRepository analysisRepository;
+    private final DimensionRepository dimensionRepository;
+    private final IssueRepository issueRepository;
 
-    public ProjectController() {
-        Map<String, Object> p1 = new LinkedHashMap<>();
-        p1.put("id", "proj-high-001");
-        p1.put("name", "高质量电商项目");
-        p1.put("description", "示例：结构清晰、测试完善、规范良好");
-        p1.put("language", "javascript");
-        p1.put("status", "completed");
-        p1.put("created_at", Instant.now().minusSeconds(2 * 24 * 3600).toString());
-        p1.put("updated_at", Instant.now().toString());
-        p1.put("file_count", 5);
-        projects.put((String) p1.get("id"), p1);
-
-        Map<String, Object> p2 = new LinkedHashMap<>();
-        p2.put("id", "proj-low-001");
-        p2.put("name", "低质量教学系统");
-        p2.put("description", "示例：复杂度高、重复多、规范较差");
-        p2.put("language", "javascript");
-        p2.put("status", "active");
-        p2.put("created_at", Instant.now().minusSeconds(24 * 3600).toString());
-        p2.put("updated_at", Instant.now().toString());
-        p2.put("file_count", 5);
-        projects.put((String) p2.get("id"), p2);
-
-        filesByProject.put(p1.get("id").toString(), new ArrayList<>(List.of(
-                fileItem("src/main.js", p1.get("id").toString(), 2456),
-                fileItem("src/App.vue", p1.get("id").toString(), 3892),
-                fileItem("src/components/ProductList.vue", p1.get("id").toString(), 5634),
-                fileItem("src/utils/formatters.js", p1.get("id").toString(), 1234),
-                fileItem("src/api/products.js", p1.get("id").toString(), 2876)
-        )));
-        filesByProject.put(p2.get("id").toString(), new ArrayList<>(List.of(
-                fileItem("src/main.js", p2.get("id").toString(), 1823),
-                fileItem("src/App.vue", p2.get("id").toString(), 2156),
-                fileItem("src/student-service.js", p2.get("id").toString(), 3456),
-                fileItem("src/auth.js", p2.get("id").toString(), 1567),
-                fileItem("components/StudentForm.vue", p2.get("id").toString(), 4234)
-        )));
-
-        Map<String, Object> highAnalysis = new LinkedHashMap<>();
-        highAnalysis.put("id", UUID.randomUUID().toString());
-        highAnalysis.put("overall_score", 92);
-        highAnalysis.put("grade", "excellent");
-        highAnalysis.put("dimensions", List.of(
-                dim("代码复杂度", 88, 100, 12),
-                dim("可维护性", 90, 100, 8),
-                dim("代码重复率", 85, 100, 6),
-                dim("安全性", 95, 100, 2),
-                dim("测试覆盖率", 89, 100, 5),
-                dim("代码规范", 93, 100, 3),
-                dim("性能", 90, 100, 4)
-        ));
-        highAnalysis.put("issues", List.of());
-        highAnalysis.put("created_at", Instant.now().minusSeconds(2 * 24 * 3600).toString());
-        analysesByProject.put(p1.get("id").toString(), new ArrayList<>(List.of(highAnalysis)));
-        p1.put("last_analysis_id", highAnalysis.get("id"));
-
-        Map<String, Object> lowAnalysis = new LinkedHashMap<>();
-        lowAnalysis.put("id", UUID.randomUUID().toString());
-        lowAnalysis.put("overall_score", 58);
-        lowAnalysis.put("grade", "poor");
-        lowAnalysis.put("dimensions", List.of(
-                dim("代码复杂度", 42, 100, 38),
-                dim("代码规范", 55, 100, 68),
-                dim("代码重复率", 60, 100, 23),
-                dim("安全性", 65, 100, 12),
-                dim("测试覆盖率", 25, 100, 45),
-                dim("可维护性", 42, 100, 38),
-                dim("性能", 68, 100, 15)
-        ));
-        lowAnalysis.put("issues", List.of());
-        lowAnalysis.put("created_at", Instant.now().minusSeconds(24 * 3600).toString());
-        analysesByProject.put(p2.get("id").toString(), new ArrayList<>(List.of(lowAnalysis)));
-        p2.put("last_analysis_id", lowAnalysis.get("id"));
-    }
-
+    // -------------------------- 项目管理 --------------------------
     @GetMapping("/projects")
     public List<Map<String, Object>> listProjects() {
-        return projects.values().stream().map(p -> {
-            Object lastId = p.get("last_analysis_id");
-            if (lastId != null) {
-                Map<String, Object> last = findAnalysis(p.get("id").toString(), lastId.toString());
-                if (last != null) {
-                    Map<String, Object> lastAnalysis = new LinkedHashMap<>();
-                    lastAnalysis.put("overallScore", last.get("overall_score"));
-                    lastAnalysis.put("grade", last.get("grade"));
-                    lastAnalysis.put("completedAt", last.get("created_at"));
-                    lastAnalysis.put("taskId", last.get("id"));
-                    Map<String, Object> copy = new LinkedHashMap<>(p);
-                    copy.put("lastAnalysis", lastAnalysis);
-                    return copy;
-                }
-            }
-            return p;
-        }).collect(Collectors.toList());
+        List<Project> projects = projectRepository.findAll();
+        System.out.println("getProject called");
+        return projects.stream()
+                .map(this::enrichProjectWithLastAnalysis)
+                .map(this::convertToMap)
+                .collect(Collectors.toList());
     }
 
     @PostMapping("/projects")
     public Map<String, Object> createProject(@RequestBody Map<String, Object> body) {
-        String id = UUID.randomUUID().toString();
-        Map<String, Object> p = new LinkedHashMap<>();
-        p.put("id", id);
-        p.put("name", String.valueOf(body.getOrDefault("name", "新项目")));
-        p.put("description", String.valueOf(body.getOrDefault("description", "")));
-        p.put("language", String.valueOf(body.getOrDefault("language", "javascript")));
-        p.put("status", "active");
-        p.put("created_at", Instant.now().toString());
-        p.put("updated_at", Instant.now().toString());
-        p.put("file_count", 0);
-        projects.put(id, p);
-        return p;
+        Project project = new Project();
+        project.setName((String) body.getOrDefault("name", "新项目"));
+        project.setDescription((String) body.getOrDefault("description", ""));
+        project.setLanguage((String) body.getOrDefault("language", "javascript"));
+        project.setStatus("active");
+        project.setFileCount(0);
+        System.out.println("createProject called");
+        Project saved = projectRepository.save(project);
+        return convertToMap(enrichProjectWithLastAnalysis(saved));
     }
 
     @GetMapping("/projects/{id}")
     public Map<String, Object> getProject(@PathVariable String id) {
-        Map<String, Object> p = projects.get(id);
-        if (p == null) return Map.of("error", "项目不存在");
-        Object lastId = p.get("last_analysis_id");
-        if (lastId != null) {
-            Map<String, Object> last = findAnalysis(id, lastId.toString());
-            if (last != null) {
-                Map<String, Object> lastAnalysis = new LinkedHashMap<>();
-                lastAnalysis.put("overallScore", last.get("overall_score"));
-                lastAnalysis.put("grade", last.get("grade"));
-                lastAnalysis.put("completedAt", last.get("created_at"));
-                lastAnalysis.put("taskId", last.get("id"));
-                Map<String, Object> copy = new LinkedHashMap<>(p);
-                copy.put("lastAnalysis", lastAnalysis);
-                return copy;
-            }
+        Optional<Project> projectOpt = projectRepository.findById(id);
+        if (projectOpt.isPresent()) {
+            Project project = enrichProjectWithLastAnalysis(projectOpt.get());
+            return convertToMap(project);
+        } else {
+            return Map.<String, Object>of("error", "项目不存在");
         }
-        return p;
     }
 
+    @PutMapping("/projects/{id}")
+    public Map<String, Object> updateProject(@PathVariable String id, @RequestBody Map<String, Object> body) {
+        Optional<Project> projectOpt = projectRepository.findById(id);
+        if (projectOpt.isPresent()) {
+            Project project = projectOpt.get();
+            if (body.containsKey("name")) project.setName((String) body.get("name"));
+            if (body.containsKey("description")) project.setDescription((String) body.get("description"));
+            if (body.containsKey("language")) project.setLanguage((String) body.get("language"));
+            if (body.containsKey("status")) project.setStatus((String) body.get("status"));
+            project.setUpdatedAt(Instant.now());
+            Project updated = projectRepository.save(project);
+            return convertToMap(enrichProjectWithLastAnalysis(updated));
+        } else {
+            return Map.<String, Object>of("error", "项目不存在");
+        }
+    }
+
+    @DeleteMapping("/projects/{id}")
+    @Transactional
+    public Map<String, Object> deleteProject(@PathVariable String id) {
+        Optional<Project> projectOpt = projectRepository.findById(id);
+        if (projectOpt.isPresent()) {
+            Project project = projectOpt.get();
+            // 1. 删除本地文件
+            try {
+                Path base = Paths.get("uploads").resolve(id);
+                if (Files.exists(base)) {
+                    Files.walk(base)
+                            .sorted(Comparator.reverseOrder())
+                            .forEach(p -> {
+                                try { Files.deleteIfExists(p); } catch (IOException ignored) {}
+                            });
+                }
+            } catch (Exception ignored) {}
+
+            // 2. 删除数据库记录（级联删除文件、分析结果等）
+            projectRepository.delete(project);
+            return Map.<String, Object>of("message", "项目删除成功", "id", id);
+        } else {
+            return Map.<String, Object>of("error", "项目不存在");
+        }
+    }
+
+    // -------------------------- 文件管理 --------------------------
     @GetMapping("/projects/{id}/files")
     public Map<String, Object> listFiles(@PathVariable String id) {
-        List<Map<String, Object>> files = filesByProject.getOrDefault(id, new ArrayList<>());
+        if (!projectRepository.existsById(id)) {
+            return Map.<String, Object>of("error", "项目不存在");
+        }
+        List<ProjectFile> files = fileRepository.findByProjectId(id);
         int totalFiles = files.size();
-        long totalSize = files.stream().mapToLong(f -> Long.parseLong(String.valueOf(f.getOrDefault("file_size", 0)))).sum();
-        projects.computeIfPresent(id, (k, p) -> {
-            p.put("file_count", totalFiles);
-            p.put("updated_at", Instant.now().toString());
-            return p;
+        long totalSize = files.stream().mapToLong(ProjectFile::getFileSize).sum();
+
+        // 更新项目文件数
+        projectRepository.findById(id).ifPresent(project -> {
+            project.setFileCount(totalFiles);
+            project.setUpdatedAt(Instant.now());
+            projectRepository.save(project);
         });
-        return Map.of("files", files, "totalFiles", totalFiles, "totalSize", totalSize);
+
+        return Map.of(
+                "files", files.stream().map(this::convertToMap).collect(Collectors.toList()),
+                "totalFiles", totalFiles,
+                "totalSize", totalSize
+        );
     }
 
     @GetMapping("/projects/{id}/files/content")
     public Map<String, Object> getFileContent(@PathVariable String id, @RequestParam("path") String path) throws IOException {
         String filename = Paths.get(path).getFileName().toString();
-        Path abs = Paths.get("uploads").resolve(id).resolve(filename);
+        Path absPath = Paths.get("uploads").resolve(id).resolve(filename);
         String content;
         long size = 0;
-        if (Files.exists(abs)) {
-            content = Files.readString(abs);
-            size = Files.size(abs);
+
+        if (Files.exists(absPath)) {
+            content = Files.readString(absPath);
+            size = Files.size(absPath);
         } else {
             content = "示例文件内容: " + filename;
         }
+
         return Map.of("path", path, "content", content, "size", size);
     }
 
     @PostMapping(value = "/projects/{id}/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Map<String, Object> upload(@PathVariable String id, @RequestPart("files") MultipartFile[] files) throws IOException {
-        List<Map<String, Object>> list = filesByProject.computeIfAbsent(id, k -> new ArrayList<>());
-        Path base = Paths.get("uploads").resolve(id);
-        Files.createDirectories(base);
-        List<Map<String, Object>> uploaded = new ArrayList<>();
-        String uploadTime = Instant.now().toString();
-        for (MultipartFile f : files) {
-            String original = StringUtils.cleanPath(Objects.requireNonNull(f.getOriginalFilename()));
-            String name = UUID.randomUUID() + "_" + original;
-            Path target = base.resolve(name);
-            Files.copy(f.getInputStream(), target);
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("id", UUID.randomUUID().toString());
-            item.put("project_id", id);
-            item.put("filename", original);
-            item.put("file_path", "/uploads/" + id + "/" + name);
-            item.put("file_size", f.getSize());
-            item.put("upload_time", uploadTime);
-            list.add(item);
-            uploaded.add(item);
+        if (!projectRepository.existsById(id)) {
+            return Map.<String, Object>of("error", "项目不存在");
         }
-        projects.computeIfPresent(id, (k, p) -> {
-            p.put("file_count", list.size());
-            p.put("updated_at", Instant.now().toString());
-            return p;
+
+        List<ProjectFile> uploadedFiles = new ArrayList<>();
+        Path baseDir = Paths.get("uploads").resolve(id);
+        Files.createDirectories(baseDir);
+        Instant uploadTime = Instant.now();
+
+        for (MultipartFile file : files) {
+            String originalFilename = StringUtils.cleanPath(Objects.requireNonNull(file.getOriginalFilename()));
+            String storedFilename = UUID.randomUUID() + "_" + originalFilename;
+            Path targetPath = baseDir.resolve(storedFilename);
+
+            // 保存文件到本地
+            Files.copy(file.getInputStream(), targetPath);
+
+            // 保存文件元数据到数据库
+            ProjectFile projectFile = new ProjectFile();
+            projectFile.setProjectId(id);
+            projectFile.setFilename(originalFilename);
+            projectFile.setFilePath("/uploads/" + id + "/" + storedFilename);
+            projectFile.setFileSize(file.getSize());
+            projectFile.setUploadTime(uploadTime);
+            uploadedFiles.add(fileRepository.save(projectFile));
+        }
+
+        // 更新项目文件数和更新时间
+        projectRepository.findById(id).ifPresent(project -> {
+            project.setFileCount(fileRepository.findByProjectId(id).size());
+            project.setUpdatedAt(Instant.now());
+            projectRepository.save(project);
         });
-        return Map.of("message", "成功上传 " + uploaded.size() + " 个文件", "uploadedFiles", uploaded, "errors", List.of(), "totalFiles", files.length);
+
+        return Map.of(
+                "message", "成功上传 " + uploadedFiles.size() + " 个文件",
+                "uploadedFiles", uploadedFiles.stream().map(this::convertToMap).collect(Collectors.toList()),
+                "errors", List.of(),
+                "totalFiles", files.length
+        );
     }
 
     @DeleteMapping("/projects/{id}/files/{fileId}")
+    @Transactional
     public Map<String, Object> deleteFile(@PathVariable String id, @PathVariable String fileId) {
-        List<Map<String, Object>> list = filesByProject.getOrDefault(id, new ArrayList<>());
-        Map<String, Object> found = null;
-        for (Map<String, Object> f : list) {
-            if (Objects.equals(f.get("id"), fileId)) {
-                found = f;
-                break;
+        Optional<ProjectFile> fileOpt = fileRepository.findById(fileId);
+        if (fileOpt.isPresent()) {
+            ProjectFile file = fileOpt.get();
+            if (file.getProjectId().equals(id)) {
+                // 删除本地文件
+                String filePath = file.getFilePath();
+                String filename = Paths.get(filePath).getFileName().toString();
+                Path absPath = Paths.get("uploads").resolve(id).resolve(filename);
+                try { Files.deleteIfExists(absPath); } catch (IOException ignored) {}
+
+                // 删除数据库记录
+                fileRepository.delete(file);
+
+                // 更新项目文件数
+                projectRepository.findById(id).ifPresent(project -> {
+                    project.setFileCount(fileRepository.findByProjectId(id).size());
+                    project.setUpdatedAt(Instant.now());
+                    projectRepository.save(project);
+                });
+
+                return Map.of(
+                        "message", "文件删除成功",
+                        "fileId", fileId,
+                        "deletedFile", Map.of(
+                                "id", file.getId(),
+                                "filename", file.getFilename(),
+                                "file_path", file.getFilePath()
+                        )
+                );
+            } else {
+                return Map.<String, Object>of("error", "文件不属于该项目");
             }
+        } else {
+            return Map.<String, Object>of("error", "文件不存在");
         }
-        if (found == null) return Map.of("error", "文件不存在");
-        String filePath = String.valueOf(found.getOrDefault("file_path", ""));
-        String filename = Paths.get(filePath).getFileName().toString();
-        Path abs = Paths.get("uploads").resolve(id).resolve(filename);
-        try {
-            Files.deleteIfExists(abs);
-        } catch (IOException ignored) {}
-        list.remove(found);
-        projects.computeIfPresent(id, (k, p) -> {
-            p.put("file_count", list.size());
-            p.put("updated_at", Instant.now().toString());
-            return p;
-        });
-        return Map.of("message", "文件删除成功", "fileId", fileId, "deletedFile", Map.of("id", found.get("id"), "filename", found.get("filename"), "file_path", found.get("file_path")));
     }
 
     @DeleteMapping("/projects/{id}/files")
+    @Transactional
     public Map<String, Object> deleteFileByPath(@PathVariable String id, @RequestParam("path") String path) {
-        List<Map<String, Object>> list = filesByProject.getOrDefault(id, new ArrayList<>());
-        Map<String, Object> found = null;
-        for (Map<String, Object> f : list) {
-            if (Objects.equals(String.valueOf(f.getOrDefault("file_path", "")), path)) {
-                found = f;
-                break;
-            }
+        Optional<ProjectFile> fileOpt = fileRepository.findByProjectIdAndFilePath(id, path);
+        if (fileOpt.isPresent()) {
+            ProjectFile file = fileOpt.get();
+            // 删除本地文件
+            String filename = Paths.get(path).getFileName().toString();
+            Path absPath = Paths.get("uploads").resolve(id).resolve(filename);
+            try { Files.deleteIfExists(absPath); } catch (IOException ignored) {}
+
+            // 删除数据库记录
+            fileRepository.delete(file);
+
+            // 更新项目文件数
+            projectRepository.findById(id).ifPresent(project -> {
+                project.setFileCount(fileRepository.findByProjectId(id).size());
+                project.setUpdatedAt(Instant.now());
+                projectRepository.save(project);
+            });
+
+            return Map.of(
+                    "message", "文件删除成功",
+                    "deletedFile", Map.of(
+                            "id", file.getId(),
+                            "filename", file.getFilename(),
+                            "file_path", file.getFilePath()
+                    )
+            );
+        } else {
+            return Map.<String, Object>of("error", "文件不存在");
         }
-        if (found == null) return Map.of("error", "文件不存在");
-        String filename = Paths.get(path).getFileName().toString();
-        Path abs = Paths.get("uploads").resolve(id).resolve(filename);
-        try { Files.deleteIfExists(abs); } catch (IOException ignored) {}
-        list.remove(found);
-        projects.computeIfPresent(id, (k, p) -> {
-            p.put("file_count", list.size());
-            p.put("updated_at", Instant.now().toString());
-            return p;
-        });
-        return Map.of("message", "文件删除成功", "deletedFile", Map.of("id", found.get("id"), "filename", found.get("filename"), "file_path", found.get("file_path")));
     }
 
+    // -------------------------- 分析管理 --------------------------
     @PostMapping("/projects/{id}/analyze")
+    @Transactional
     public Map<String, Object> analyze(@PathVariable String id) {
-        Map<String, Object> p = projects.get(id);
-        if (p == null) return Map.of("error", "项目不存在");
-        Map<String, Object> mock = new LinkedHashMap<>();
-        mock.put("id", UUID.randomUUID().toString());
-        mock.put("overall_score", 70 + new Random().nextInt(30));
-        mock.put("grade", "good");
-        mock.put("dimensions", List.of(
-                dim("代码复杂度", 75, 100, 3),
-                dim("可维护性", 78, 100, 2),
-                dim("重复度", 82, 100, 1),
-                dim("安全性", 85, 100, 1),
-                dim("性能", 70, 100, 4),
-                dim("代码风格", 80, 100, 2),
-                dim("测试覆盖", 65, 100, 6)
-        ));
-        mock.put("issues", List.of(Map.of("id", UUID.randomUUID().toString(), "type", "complexity", "severity", "medium", "file", "/src/components/Example.vue", "line", 45, "message", "函数复杂度过高", "suggestion", "建议拆分为多个小函数")));
-        mock.put("created_at", Instant.now().toString());
-        analysesByProject.computeIfAbsent(id, k -> new ArrayList<>()).add(mock);
-        p.put("last_analysis_id", mock.get("id"));
-        p.put("status", "completed");
-        p.put("updated_at", Instant.now().toString());
-        return Map.of("message", "分析完成", "analysisId", mock.get("id"), "result", Map.of(
-                "id", mock.get("id"),
-                "projectId", id,
-                "overallScore", mock.get("overall_score"),
-                "grade", mock.get("grade"),
-                "dimensions", mock.get("dimensions"),
-                "issues", mock.get("issues"),
-                "created_at", mock.get("created_at")
-        ));
+        Optional<Project> projectOpt = projectRepository.findById(id);
+        if (projectOpt.isPresent()) {
+            Project project = projectOpt.get();
+            // 1. 创建分析结果
+            Analysis analysis = new Analysis();
+            analysis.setProjectId(id);
+            analysis.setOverallScore(70 + new Random().nextInt(30));
+            analysis.setGrade("good");
+            analysis.setCreatedAt(Instant.now());
+
+            // 2. 创建维度评分
+            List<Dimension> dimensions = List.of(
+                    createDimension(analysis.getId(), "代码复杂度", 75, 100, 3),
+                    createDimension(analysis.getId(), "可维护性", 78, 100, 2),
+                    createDimension(analysis.getId(), "重复度", 82, 100, 1),
+                    createDimension(analysis.getId(), "安全性", 85, 100, 1),
+                    createDimension(analysis.getId(), "性能", 70, 100, 4),
+                    createDimension(analysis.getId(), "代码风格", 80, 100, 2),
+                    createDimension(analysis.getId(), "测试覆盖", 65, 100, 6)
+            );
+            dimensionRepository.saveAll(dimensions);
+            analysis.setDimensions(dimensions);
+
+            // 3. 创建问题
+            Issue issue = new Issue();
+            issue.setAnalysisId(analysis.getId());
+            issue.setType("complexity");
+            issue.setSeverity("medium");
+            issue.setFile("/src/components/Example.vue");
+            issue.setLine(45);
+            issue.setMessage("函数复杂度过高");
+            issue.setSuggestion("建议拆分为多个小函数");
+            Issue savedIssue = issueRepository.save(issue);
+            analysis.setIssues(List.of(savedIssue));
+
+            // 4. 保存分析结果
+            Analysis savedAnalysis = analysisRepository.save(analysis);
+
+            // 5. 更新项目状态和最新分析ID
+            project.setStatus("completed");
+            project.setLastAnalysisId(savedAnalysis.getId());
+            project.setUpdatedAt(Instant.now());
+            projectRepository.save(project);
+
+            // 6. 返回结果
+            return Map.of(
+                    "message", "分析完成",
+                    "analysisId", savedAnalysis.getId(),
+                    "result", Map.of(
+                            "id", savedAnalysis.getId(),
+                            "projectId", id,
+                            "overallScore", savedAnalysis.getOverallScore(),
+                            "grade", savedAnalysis.getGrade(),
+                            "dimensions", savedAnalysis.getDimensions().stream().map(this::convertToMap).collect(Collectors.toList()),
+                            "issues", savedAnalysis.getIssues().stream().map(this::convertToMap).collect(Collectors.toList()),
+                            "created_at", savedAnalysis.getCreatedAt().toString()
+                    )
+            );
+        } else {
+            return Map.<String, Object>of("error", "项目不存在");
+        }
     }
 
     @DeleteMapping("/projects/{id}/analyze")
     public Map<String, Object> cancelAnalyze(@PathVariable String id) {
-        Map<String, Object> p = projects.get(id);
-        if (p == null) return Map.of("error", "项目不存在");
-        p.put("status", "cancelled");
-        p.put("updated_at", Instant.now().toString());
-        return Map.of("message", "已取消分析", "projectId", id, "status", "cancelled");
-    }
-
-    @PostMapping("/projects/{id}/git")
-    public Map<String, Object> importGit(@PathVariable String id, @RequestBody Map<String, Object> body) {
-        String repo = String.valueOf(body.getOrDefault("repo", ""));
-        projects.computeIfPresent(id, (k, p) -> {
-            p.put("updated_at", Instant.now().toString());
-            return p;
-        });
-        return Map.of("message", "导入成功", "repo", repo, "taskId", UUID.randomUUID().toString());
+        Optional<Project> projectOpt = projectRepository.findById(id);
+        if (projectOpt.isPresent()) {
+            Project project = projectOpt.get();
+            project.setStatus("cancelled");
+            project.setUpdatedAt(Instant.now());
+            projectRepository.save(project);
+            return Map.of("message", "已取消分析", "projectId", id, "status", "cancelled");
+        } else {
+            return Map.<String, Object>of("error", "项目不存在");
+        }
     }
 
     @GetMapping("/projects/{id}/analysis")
     public Map<String, Object> getAnalysis(@PathVariable String id) {
-        List<Map<String, Object>> list = analysesByProject.getOrDefault(id, new ArrayList<>());
-        if (list.isEmpty()) return Map.of("error", "该项目暂无分析结果");
-        Map<String, Object> analysis = list.get(list.size() - 1);
-        Map<String, Object> project = projects.get(id);
-        List<Map<String, Object>> dimensions = (List<Map<String, Object>>) analysis.get("dimensions");
-        List<Map<String, Object>> issues = (List<Map<String, Object>>) analysis.get("issues");
-        Map<String, Object> metrics = new LinkedHashMap<>();
-        metrics.put("fileCount", project.get("file_count"));
-        metrics.put("totalIssues", issues.size());
-        metrics.put("criticalIssues", issues.stream().filter(i -> Objects.equals(i.get("severity"), "critical")).count());
-        metrics.put("majorIssues", issues.stream().filter(i -> Objects.equals(i.get("severity"), "major")).count());
-        metrics.put("minorIssues", issues.stream().filter(i -> Objects.equals(i.get("severity"), "minor")).count());
-        Map<String, Object> summary = new LinkedHashMap<>();
-        summary.put("suggestions", dimensions.stream().map(d -> String.format("优化%s相关代码", String.valueOf(d.get("name")))).collect(Collectors.toList()));
-        return Map.of(
-                "projectId", id,
-                "projectName", String.valueOf(project.get("name")),
-                "overallScore", analysis.get("overall_score"),
-                "grade", analysis.get("grade"),
-                "dimensions", dimensions,
-                "issues", issues,
-                "completedAt", analysis.get("created_at"),
-                "taskId", analysis.get("id"),
-                "metrics", metrics,
-                "summary", summary
-        );
+        if (!projectRepository.existsById(id)) {
+            return Map.<String, Object>of("error", "项目不存在");
+        }
+
+        Optional<Analysis> analysisOpt = analysisRepository.findTopByProjectIdOrderByCreatedAtDesc(id);
+        if (analysisOpt.isPresent()) {
+            Analysis analysis = analysisOpt.get();
+            Project project = projectRepository.findById(id).get(); // 已判断项目存在，直接get
+            List<Issue> issues = analysis.getIssues();
+
+            // 统计指标
+            Map<String, Object> metrics = new LinkedHashMap<>();
+            metrics.put("fileCount", project.getFileCount());
+            metrics.put("totalIssues", issues.size());
+            metrics.put("criticalIssues", issues.stream().filter(i -> "critical".equals(i.getSeverity())).count());
+            metrics.put("majorIssues", issues.stream().filter(i -> "major".equals(i.getSeverity())).count());
+            metrics.put("minorIssues", issues.stream().filter(i -> "minor".equals(i.getSeverity())).count());
+
+            // 优化建议
+            Map<String, Object> summary = new LinkedHashMap<>();
+            summary.put("suggestions", analysis.getDimensions().stream()
+                    .map(d -> String.format("优化%s相关代码", d.getName()))
+                    .collect(Collectors.toList()));
+
+            return Map.of(
+                    "projectId", id,
+                    "projectName", project.getName(),
+                    "overallScore", analysis.getOverallScore(),
+                    "grade", analysis.getGrade(),
+                    "dimensions", analysis.getDimensions().stream().map(this::convertToMap).collect(Collectors.toList()),
+                    "issues", issues.stream().map(this::convertToMap).collect(Collectors.toList()),
+                    "completedAt", analysis.getCreatedAt().toString(),
+                    "taskId", analysis.getId(),
+                    "metrics", metrics,
+                    "summary", summary
+            );
+        } else {
+            return Map.<String, Object>of("error", "该项目暂无分析结果");
+        }
     }
 
     @GetMapping("/projects/{id}/analysis/status")
     public Map<String, Object> getStatus(@PathVariable String id) {
-        Map<String, Object> p = projects.get(id);
-        if (p == null) return Map.of("error", "项目不存在");
-        String status = String.valueOf(p.getOrDefault("status", "idle"));
-        int progress = Objects.equals(status, "completed") ? 100 : 0;
-        return Map.of("projectId", id, "status", status, "progress", progress, "updatedAt", p.get("updated_at"));
+        Optional<Project> projectOpt = projectRepository.findById(id);
+        if (projectOpt.isPresent()) {
+            Project project = projectOpt.get();
+            String status = project.getStatus();
+            int progress = "completed".equals(status) ? 100 : 0;
+            return Map.of(
+                    "projectId", id,
+                    "status", status,
+                    "progress", progress,
+                    "updatedAt", project.getUpdatedAt().toString()
+            );
+        } else {
+            return Map.<String, Object>of("error", "项目不存在");
+        }
     }
 
     @GetMapping("/projects/{id}/analysis/logs")
     public Map<String, Object> getLogs(@PathVariable String id) {
-        Map<String, Object> p = projects.get(id);
-        if (p == null) return Map.of("error", "项目不存在");
-        List<Map<String, Object>> logs = new ArrayList<>();
-        logs.add(Map.of("timestamp", p.get("created_at"), "level", "info", "message", "项目创建: " + p.get("name"), "source", "system"));
-        List<Map<String, Object>> list = analysesByProject.getOrDefault(id, new ArrayList<>());
-        for (int i = 0; i < list.size(); i++) {
-            Map<String, Object> a = list.get(i);
-            logs.add(Map.of("timestamp", a.get("created_at"), "level", "info", "message", "分析完成 #" + (list.size() - i) + " - 总分: " + a.get("overall_score") + "分", "source", "analyzer"));
-            List<Map<String, Object>> dims = (List<Map<String, Object>>) a.get("dimensions");
-            for (Map<String, Object> d : dims) {
-                logs.add(Map.of("timestamp", a.get("created_at"), "level", "debug", "message", d.get("name") + ": " + d.get("score") + "分 (问题: " + d.get("issues") + "个)", "source", "analyzer"));
+        Optional<Project> projectOpt = projectRepository.findById(id);
+        if (projectOpt.isPresent()) {
+            Project project = projectOpt.get();
+            List<Map<String, Object>> logs = new ArrayList<>();
+            // 项目创建日志
+            logs.add(Map.of(
+                    "timestamp", project.getCreatedAt().toString(),
+                    "level", "info",
+                    "message", "项目创建: " + project.getName(),
+                    "source", "system"
+            ));
+
+            // 分析日志
+            List<Analysis> analyses = analysisRepository.findByProjectIdOrderByCreatedAtDesc(id);
+            for (int i = 0; i < analyses.size(); i++) {
+                Analysis analysis = analyses.get(i);
+                logs.add(Map.of(
+                        "timestamp", analysis.getCreatedAt().toString(),
+                        "level", "info",
+                        "message", "分析完成 #" + (analyses.size() - i) + " - 总分: " + analysis.getOverallScore() + "分",
+                        "source", "analyzer"
+                ));
+
+                // 维度日志
+                for (Dimension dim : analysis.getDimensions()) {
+                    logs.add(Map.of(
+                            "timestamp", analysis.getCreatedAt().toString(),
+                            "level", "debug",
+                            "message", dim.getName() + ": " + dim.getScore() + "分 (问题: " + dim.getIssues() + "个)",
+                            "source", "analyzer"
+                    ));
+                }
             }
+
+            Collections.reverse(logs);
+            return Map.of(
+                    "projectId", id,
+                    "logs", logs,
+                    "totalLogs", logs.size()
+            );
+        } else {
+            return Map.<String, Object>of("error", "项目不存在");
         }
-        Collections.reverse(logs);
-        return Map.of("projectId", id, "logs", logs, "totalLogs", logs.size());
     }
 
     @GetMapping("/projects/{id}/analysis/history")
     public List<Map<String, Object>> getHistory(@PathVariable String id) {
-        return analysesByProject.getOrDefault(id, new ArrayList<>()).stream().map(a -> Map.of(
-                "taskId", a.get("id"),
-                "completedAt", a.get("created_at"),
-                "overallScore", a.get("overall_score"),
-                "grade", a.get("grade"),
-                "dimensions", a.get("dimensions")
-        )).collect(Collectors.toList());
-    }
-
-    @PutMapping("/projects/{id}")
-    public Map<String, Object> updateProject(@PathVariable String id, @RequestBody Map<String, Object> body) {
-        Map<String, Object> p = projects.get(id);
-        if (p == null) return Map.of("error", "项目不存在");
-        if (body.containsKey("name")) p.put("name", String.valueOf(body.get("name")));
-        if (body.containsKey("description")) p.put("description", String.valueOf(body.get("description")));
-        if (body.containsKey("language")) p.put("language", String.valueOf(body.get("language")));
-        if (body.containsKey("status")) p.put("status", String.valueOf(body.get("status")));
-        if (body.containsKey("config")) p.put("config", body.get("config"));
-        p.put("updated_at", Instant.now().toString());
-        Object lastId = p.get("last_analysis_id");
-        if (lastId != null) {
-            Map<String, Object> last = findAnalysis(id, lastId.toString());
-            if (last != null) {
-                Map<String, Object> lastAnalysis = new LinkedHashMap<>();
-                lastAnalysis.put("overallScore", last.get("overall_score"));
-                lastAnalysis.put("grade", last.get("grade"));
-                lastAnalysis.put("completedAt", last.get("created_at"));
-                lastAnalysis.put("taskId", last.get("id"));
-                Map<String, Object> copy = new LinkedHashMap<>(p);
-                copy.put("lastAnalysis", lastAnalysis);
-                return copy;
-            }
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (!projectRepository.existsById(id)) {
+            result.add(Map.<String, Object>of("error", "项目不存在"));
+            return result;
         }
-        return p;
+
+        List<Analysis> analyses = analysisRepository.findByProjectIdOrderByCreatedAtDesc(id);
+        if (analyses.isEmpty()) {
+            result.add(Map.<String, Object>of("error", "该项目暂无分析历史"));
+            return result;
+        }
+
+        return analyses.stream()
+                .map(analysis -> Map.of(
+                        "taskId", analysis.getId(),
+                        "completedAt", analysis.getCreatedAt().toString(),
+                        "overallScore", analysis.getOverallScore(),
+                        "grade", analysis.getGrade(),
+                        "dimensions", analysis.getDimensions().stream().map(this::convertToMap).collect(Collectors.toList())
+                ))
+                .collect(Collectors.toList());
     }
 
-    @DeleteMapping("/projects/{id}")
-    public Map<String, Object> deleteProject(@PathVariable String id) {
-        Map<String, Object> removed = projects.remove(id);
-        filesByProject.remove(id);
-        analysesByProject.remove(id);
-        try {
-            Path base = Paths.get("uploads").resolve(id);
-            if (Files.exists(base)) {
-                Files.walk(base)
-                        .sorted(Comparator.reverseOrder())
-                        .forEach(p -> { try { Files.deleteIfExists(p); } catch (IOException ignored) {} });
-            }
-        } catch (Exception ignored) {}
-        if (removed == null) return Map.of("error", "项目不存在");
-        return Map.of("message", "项目删除成功", "id", id);
+    // -------------------------- 辅助接口 --------------------------
+    @PostMapping("/projects/{id}/git")
+    public Map<String, Object> importGit(@PathVariable String id, @RequestBody Map<String, Object> body) {
+        Optional<Project> projectOpt = projectRepository.findById(id);
+        if (projectOpt.isPresent()) {
+            Project project = projectOpt.get();
+            String repo = (String) body.getOrDefault("repo", "");
+            project.setUpdatedAt(Instant.now());
+            projectRepository.save(project);
+            return Map.of("message", "导入成功", "repo", repo, "taskId", UUID.randomUUID().toString());
+        } else {
+            return Map.<String, Object>of("error", "项目不存在");
+        }
     }
 
     @GetMapping("/projects/stats")
     public Map<String, Object> stats() {
-        int total = projects.size();
-        long active = projects.values().stream().filter(p -> "active".equals(String.valueOf(p.get("status")))).count();
-        long archived = projects.values().stream().filter(p -> "archived".equals(String.valueOf(p.get("status")))).count();
-        long completed = projects.values().stream().filter(p -> "completed".equals(String.valueOf(p.get("status")))).count();
-        long files = filesByProject.values().stream().mapToLong(List::size).sum();
-        return Map.of("totalProjects", total, "activeProjects", active, "archivedProjects", archived, "completedProjects", completed, "totalFiles", files);
+        List<Project> allProjects = projectRepository.findAll();
+        int total = allProjects.size();
+        long active = allProjects.stream().filter(p -> "active".equals(p.getStatus())).count();
+        long archived = allProjects.stream().filter(p -> "archived".equals(p.getStatus())).count();
+        long completed = allProjects.stream().filter(p -> "completed".equals(p.getStatus())).count();
+        long totalFiles = fileRepository.count();
+
+        return Map.of(
+                "totalProjects", total,
+                "activeProjects", active,
+                "archivedProjects", archived,
+                "completedProjects", completed,
+                "totalFiles", totalFiles
+        );
     }
 
     @PostMapping("/projects/{id}/duplicate")
+    @Transactional
     public Map<String, Object> duplicate(@PathVariable String id) {
-        Map<String, Object> p = projects.get(id);
-        if (p == null) return Map.of("error", "项目不存在");
-        String newId = UUID.randomUUID().toString();
-        Map<String, Object> copy = new LinkedHashMap<>(p);
-        copy.put("id", newId);
-        copy.put("name", String.valueOf(p.get("name")) + " - 副本");
-        copy.put("created_at", Instant.now().toString());
-        copy.put("updated_at", Instant.now().toString());
-        projects.put(newId, copy);
-        List<Map<String, Object>> files = filesByProject.getOrDefault(id, new ArrayList<>());
-        filesByProject.put(newId, files.stream().map(f -> {
-            Map<String, Object> m = new LinkedHashMap<>(f);
-            m.put("id", UUID.randomUUID().toString());
-            m.put("project_id", newId);
-            return m;
-        }).collect(Collectors.toList()));
-        return copy;
+        Optional<Project> sourceProjectOpt = projectRepository.findById(id);
+        if (sourceProjectOpt.isPresent()) {
+            Project sourceProject = sourceProjectOpt.get();
+            // 1. 复制项目基本信息
+            Project newProject = new Project();
+            newProject.setName(sourceProject.getName() + " - 副本");
+            newProject.setDescription(sourceProject.getDescription());
+            newProject.setLanguage(sourceProject.getLanguage());
+            newProject.setStatus("active");
+            newProject.setFileCount(sourceProject.getFileCount());
+            Project savedProject = projectRepository.save(newProject);
+
+            // 2. 复制项目文件（仅元数据，不复制物理文件）
+            List<ProjectFile> sourceFiles = fileRepository.findByProjectId(id);
+            List<ProjectFile> newFiles = sourceFiles.stream().map(file -> {
+                ProjectFile newFile = new ProjectFile();
+                newFile.setProjectId(savedProject.getId());
+                newFile.setFilename(file.getFilename());
+                newFile.setFilePath(file.getFilePath().replace(id, savedProject.getId()));
+                newFile.setFileSize(file.getFileSize());
+                newFile.setUploadTime(Instant.now());
+                return newFile;
+            }).collect(Collectors.toList());
+            fileRepository.saveAll(newFiles);
+
+            return convertToMap(enrichProjectWithLastAnalysis(savedProject));
+        } else {
+            return Map.<String, Object>of("error", "项目不存在");
+        }
     }
 
     @PostMapping("/projects/{id}/archive")
     public Map<String, Object> archive(@PathVariable String id) {
-        Map<String, Object> p = projects.get(id);
-        if (p == null) return Map.of("error", "项目不存在");
-        p.put("status", "archived");
-        p.put("updated_at", Instant.now().toString());
-        return p;
+        Optional<Project> projectOpt = projectRepository.findById(id);
+        if (projectOpt.isPresent()) {
+            Project project = projectOpt.get();
+            project.setStatus("archived");
+            project.setUpdatedAt(Instant.now());
+            Project updated = projectRepository.save(project);
+            return convertToMap(enrichProjectWithLastAnalysis(updated));
+        } else {
+            return Map.<String, Object>of("error", "项目不存在");
+        }
     }
 
     @PostMapping("/projects/{id}/restore")
     public Map<String, Object> restore(@PathVariable String id) {
-        Map<String, Object> p = projects.get(id);
-        if (p == null) return Map.of("error", "项目不存在");
-        p.put("status", "active");
-        p.put("updated_at", Instant.now().toString());
-        return p;
-    }
-
-    private Map<String, Object> fileItem(String path, String projectId, long size) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", UUID.randomUUID().toString());
-        m.put("project_id", projectId);
-        m.put("filename", Paths.get(path).getFileName().toString());
-        m.put("file_path", "/uploads/" + projectId + "/" + path.replace("\\", "/"));
-        m.put("file_size", size);
-        m.put("upload_time", Instant.now().toString());
-        return m;
-    }
-
-    private Map<String, Object> dim(String name, int score, int maxScore, int issues) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("name", name);
-        m.put("score", score);
-        m.put("maxScore", maxScore);
-        m.put("issues", issues);
-        return m;
-    }
-
-    private Map<String, Object> findAnalysis(String projectId, String id) {
-        List<Map<String, Object>> list = analysesByProject.getOrDefault(projectId, new ArrayList<>());
-        for (Map<String, Object> a : list) {
-            if (Objects.equals(a.get("id"), id)) return a;
+        Optional<Project> projectOpt = projectRepository.findById(id);
+        if (projectOpt.isPresent()) {
+            Project project = projectOpt.get();
+            project.setStatus("active");
+            project.setUpdatedAt(Instant.now());
+            Project updated = projectRepository.save(project);
+            return convertToMap(enrichProjectWithLastAnalysis(updated));
+        } else {
+            return Map.<String, Object>of("error", "项目不存在");
         }
-        return null;
+    }
+
+    // -------------------------- 工具方法 --------------------------
+    // 为项目添加最新分析结果信息
+    private Project enrichProjectWithLastAnalysis(Project project) {
+        if (project.getLastAnalysisId() != null) {
+            analysisRepository.findById(project.getLastAnalysisId()).ifPresent(analysis -> {
+                // 仅保留分析ID关联，避免循环引用
+                project.setLastAnalysisId(analysis.getId());
+            });
+        }
+        return project;
+    }
+
+    // 实体转Map（适配原接口返回格式）
+    private Map<String, Object> convertToMap(Object obj) {
+        if (obj instanceof Project project) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("id", project.getId());
+            map.put("name", project.getName());
+            map.put("description", project.getDescription());
+            map.put("language", project.getLanguage());
+            map.put("status", project.getStatus());
+            map.put("created_at", project.getCreatedAt().toString());
+            map.put("updated_at", project.getUpdatedAt().toString());
+            map.put("file_count", project.getFileCount());
+
+            // 添加最新分析结果摘要
+            if (project.getLastAnalysisId() != null) {
+                analysisRepository.findById(project.getLastAnalysisId()).ifPresent(analysis -> {
+                    Map<String, Object> lastAnalysis = new LinkedHashMap<>();
+                    lastAnalysis.put("overallScore", analysis.getOverallScore());
+                    lastAnalysis.put("grade", analysis.getGrade());
+                    lastAnalysis.put("completedAt", analysis.getCreatedAt().toString());
+                    lastAnalysis.put("taskId", analysis.getId());
+                    map.put("lastAnalysis", lastAnalysis);
+                });
+            }
+            return map;
+        } else if (obj instanceof ProjectFile file) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("id", file.getId());
+            map.put("project_id", file.getProjectId());
+            map.put("filename", file.getFilename());
+            map.put("file_path", file.getFilePath());
+            map.put("file_size", file.getFileSize());
+            map.put("upload_time", file.getUploadTime().toString());
+            return map;
+        } else if (obj instanceof Dimension dim) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("name", dim.getName());
+            map.put("score", dim.getScore());
+            map.put("maxScore", dim.getMaxScore());
+            map.put("issues", dim.getIssues());
+            return map;
+        } else if (obj instanceof Issue issue) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("id", issue.getId());
+            map.put("type", issue.getType());
+            map.put("severity", issue.getSeverity());
+            map.put("file", issue.getFile());
+            map.put("line", issue.getLine());
+            map.put("message", issue.getMessage());
+            map.put("suggestion", issue.getSuggestion());
+            return map;
+        }
+        return Collections.emptyMap();
+    }
+
+    // 创建维度评分（辅助方法）
+    private Dimension createDimension(String analysisId, String name, int score, int maxScore, int issues) {
+        Dimension dim = new Dimension();
+        dim.setAnalysisId(analysisId);
+        dim.setName(name);
+        dim.setScore(score);
+        dim.setMaxScore(maxScore);
+        dim.setIssues(issues);
+        return dim;
     }
 }

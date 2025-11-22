@@ -1,2 +1,26 @@
 server:
   port: 9999
+
+spring:
+  datasource:
+    url: jdbc:sqlite:springboot-sqlite-jpa.db
+  jpa:
+    hibernate:
+      ddl-auto: update # 启动时自动建表/更新表结构
+    show-sql: true # 打印SQL日志（调试用）
+    properties:
+      hibernate:
+        format_sql: true # 格式化SQL
+        dialect: org.hibernate.community.dialect.SQLiteDialect # SQLite 方言
+        jdbc:
+          batch_size: 10 # 批量操作优化
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 50MB
+
+logging:
+  level:
+    org.springframework.data.jpa: INFO
+#    com.bugkiller_cityu: DEBUG
