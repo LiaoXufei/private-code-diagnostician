@@ -12,9 +12,9 @@ class CyclomaticComplexityMetricTest extends BasicMetricTest {
         try {
             CyclomaticComplexityMetric analyzer = new CyclomaticComplexityMetric();
             JavaASTInfo astInfo = new JavaASTInfo(cu, java.util.Collections.emptySet(), new byte[0]);
-            var method = CyclomaticComplexityMetric.class.getDeclaredMethod("analyzeComplexity", JavaASTInfo.class);
+            var method = CyclomaticComplexityMetric.class.getDeclaredMethod("analyzeComplexity", JavaASTInfo.class, String.class);
             method.setAccessible(true);
-            return (ScoreAndIssues) method.invoke(analyzer, astInfo);
+            return (ScoreAndIssues) method.invoke(analyzer, astInfo, "");
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -207,12 +207,13 @@ class CyclomaticComplexityMetricTest extends BasicMetricTest {
         ScoreAndIssues result = invokeAnalyze(cu);
 
         System.out.println("High Complexity Function Score: " + result.getScore());
-        result.getIssues().forEach(System.out::println);
-
+        result.getIssues().forEach(issue -> System.out.println(issue.getMessage())); // 打印具体问题描述
         assertNotNull(result);
         // 由于这是唯一的函数，avgComplexity == compute 的复杂度，应落到最高分段 -> 1.0
         assertEquals(1.0, result.getScore(), 1e-6);
-        assertTrue(result.getIssues().stream().anyMatch(msg -> msg.contains("圈复杂度过高") || msg.contains("复杂度过高")));
+        // 检查Issue的message中是否包含目标字符串
+        assertTrue(result.getIssues().stream()
+                .anyMatch(issue -> issue.getMessage().contains("圈复杂度过高") || issue.getMessage().contains("复杂度过高")));
     }
 
     /**

@@ -35,11 +35,11 @@ class NamingConventionMetricTest extends BasicMetricTest {
         ScoreAndIssues result = invokeAnalyze(cu);
 
         System.out.println("Score: " + result.getScore());
-        System.out.println("Issues: " + result.getIssues());
+        result.getIssues().forEach(issue -> System.out.println(issue.getMessage()));
 
         assertNotNull(result);
         assertFalse(result.getIssues().isEmpty(), "应检测出命名问题");
-        assertTrue(result.getIssues().stream().anyMatch(s -> s.contains("不符合规范")));
+        assertTrue(result.getIssues().stream().anyMatch(s -> s.getMessage().contains("不符合规范")));
     }
 
     @Test

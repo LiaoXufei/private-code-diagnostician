@@ -12,9 +12,9 @@ class CommentCoverageMetricTest extends BasicMetricTest {
     private static ScoreAndIssues invokeAnalyze(CompilationUnit cu, String code) {
         try {
             CommentCoverageMetric analyzer = new CommentCoverageMetric();
-            var method = CommentCoverageMetric.class.getDeclaredMethod("analyzeCommentCoverage", CompilationUnit.class, String.class);
+            var method = CommentCoverageMetric.class.getDeclaredMethod("analyzeCommentCoverage", CompilationUnit.class, String.class, String.class);
             method.setAccessible(true);
-            return (ScoreAndIssues) method.invoke(analyzer, cu, code);
+            return (ScoreAndIssues) method.invoke(analyzer, cu, code, "");
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -34,10 +34,10 @@ class CommentCoverageMetricTest extends BasicMetricTest {
         ScoreAndIssues result = invokeAnalyze(cu, code);
 
         System.out.println("Score: " + result.getScore());
-        System.out.println("Issues: " + result.getIssues());
+        result.getIssues().forEach(issue -> System.out.println(issue.getMessage()));
 
         assertNotNull(result);
-        assertTrue(result.getIssues().stream().anyMatch(s -> s.contains("缺少文档注释")));
+        assertTrue(result.getIssues().stream().anyMatch(s -> s.getMessage().contains("缺少文档注释")));
     }
 
     @Test
@@ -61,10 +61,9 @@ class CommentCoverageMetricTest extends BasicMetricTest {
         ScoreAndIssues result = invokeAnalyze(cu, code);
 
         System.out.println("Score: " + result.getScore());
-        System.out.println("Issues: " + result.getIssues());
-
+        result.getIssues().forEach(issue -> System.out.println(issue.getMessage()));
         assertNotNull(result);
         // 高注释覆盖率不应报告“缺少文档注释”
-        assertTrue(result.getIssues().stream().noneMatch(s -> s.contains("缺少文档注释")));
+        assertTrue(result.getIssues().stream().noneMatch(s -> s.getMessage().contains("缺少文档注释")));
     }
 }

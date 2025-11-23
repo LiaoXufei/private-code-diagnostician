@@ -1,5 +1,6 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
+import com.bugkiller_cityu.code_diagnostician.entity.Issue;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.Function;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
 import lombok.Data;
@@ -55,8 +56,8 @@ public class AnalysisResult {
     }
 
     // GetIssues 获取所有问题
-    public List<String> getIssues() {
-        List<String> issues = new LinkedList<>();
+    public List<Issue> getIssues() {
+        List<Issue> issues = new LinkedList<>();
         for(MetricResult metricResult: metricResults.values()){
             issues.addAll(metricResult.issues);
         }

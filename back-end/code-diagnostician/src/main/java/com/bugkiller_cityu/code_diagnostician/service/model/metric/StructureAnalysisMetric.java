@@ -1,5 +1,6 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
+import com.bugkiller_cityu.code_diagnostician.entity.Issue;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
 import lombok.Getter;
 import lombok.Setter;
@@ -18,10 +19,11 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
                 0.15
         );
     }
-    // Analyze 分析代码结构
+
+    // 分析代码结构，返回包含Issue对象的结果
     public MetricResult analyze(ParseResult parseResult){
         JavaASTInfo astInfo = JavaASTExtractor.extractJavaAST(parseResult);
-        List<String> issues = new ArrayList<>();
+        List<Issue> issues = new ArrayList<>();  // 改为List<Issue>类型
         if (astInfo == null){
             return new MetricResult(
                     0.3,
@@ -34,15 +36,15 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
         // 分析嵌套深度
         CompilationUnit cu = astInfo.getCompilationUnit();
         int[] maxNestingDepthRef = {0};
-        List<String> nestingIssues = analyzeNestingDepth(cu, maxNestingDepthRef);
+        List<Issue> nestingIssues = analyzeNestingDepth(cu, maxNestingDepthRef);
         issues.addAll(nestingIssues);
 
         // 分析循环引用
-        List<String> circularIssues = analyzeCircularDependencies(cu);
+        List<Issue> circularIssues = analyzeCircularDependencies(cu);
         issues.addAll(circularIssues);
 
         // 分析导入复杂度
-        List<String> importIssues = analyzeImportComplexity(cu);
+        List<Issue> importIssues = analyzeImportComplexity(cu);
         issues.addAll(importIssues);
 
         // 计算结构得分
@@ -60,9 +62,10 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
         );
     }
 
-    // analyzeNestingDepth：分析代码嵌套深度
-    public List<String> analyzeNestingDepth(CompilationUnit cu, int[] maxDepthRef) {
-        List<String> issues = new ArrayList<>();
+    // 分析嵌套深度，返回List<Issue>
+    public List<Issue> analyzeNestingDepth(CompilationUnit cu, int[] maxDepthRef) {
+        List<Issue> issues = new ArrayList<>();
+        String filePath = (String) cu.getProperty("filePath");
 
         cu.accept(new ASTVisitor() {
             @Override
@@ -73,10 +76,22 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
                 }
 
                 String methodName = node.getName().getIdentifier();
+                int lineNumber = cu.getLineNumber(node.getStartPosition());  // 获取行号
+                Issue issue = new Issue();
+                issue.setFile(filePath);
+                issue.setLine(lineNumber);
+                issue.setType("nesting_depth");  // 问题类型：嵌套深度
+
                 if (depth > 5) {
-                    issues.add(String.format("函数 %s 的循环复杂度过高 (%d)，考虑重构", methodName, depth));
+                    issue.setSeverity("major");  // 严重程度：主要
+                    issue.setMessage(String.format("函数 %s 的嵌套深度过高 (%d)", methodName, depth));
+                    issue.setSuggestion("考虑重构函数，拆分复杂逻辑以降低嵌套层次");
+                    issues.add(issue);
                 } else if (depth > 3) {
-                    issues.add(String.format("函数 %s 的循环复杂度较高 (%d)，建议简化", methodName, depth));
+                    issue.setSeverity("medium");  // 严重程度：中等
+                    issue.setMessage(String.format("函数 %s 的嵌套深度较高 (%d)", methodName, depth));
+                    issue.setSuggestion("建议简化逻辑，减少条件判断或循环的嵌套层级");
+                    issues.add(issue);
                 }
 
                 return super.visit(node);
@@ -86,20 +101,18 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
         return issues;
     }
 
-    // calculateNestingDepth：计算代码块的最大嵌套深度
+    // 计算代码块的最大嵌套深度（保持不变）
     private int calculateNestingDepth(Block block) {
         if (block == null) {
             return 0;
         }
 
         final int[] maxDepth = {0};
-
-        // 递归分析嵌套结构
         inspectBlock(block, 1, maxDepth);
-
         return maxDepth[0];
     }
 
+    // 递归检查代码块嵌套（保持不变）
     private void inspectBlock(Block block, int currentDepth, int[] maxDepth) {
         if (block == null) return;
 
@@ -120,7 +133,6 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
                         if (elseStmt instanceof Block) {
                             inspectBlock((Block) elseStmt, currentDepth + 1, maxDepth);
                         } else if (elseStmt instanceof IfStatement) {
-                            // 递归处理 else-if
                             inspectBlock(extractBlock(((IfStatement) elseStmt).getThenStatement()), currentDepth + 1, maxDepth);
                         }
                     }
@@ -149,42 +161,42 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
         }
     }
 
-    // 提取 block（防止 body 是单语句而非 Block）
+    // 提取代码块（保持不变）
     private Block extractBlock(Statement stmt) {
         if (stmt instanceof Block) {
             return (Block) stmt;
         }
         if (stmt == null) return null;
 
-        // 创建一个虚拟 block 包裹单语句
         AST ast = stmt.getAST();
         Block block = ast.newBlock();
         block.statements().add(ASTNode.copySubtree(ast, stmt));
         return block;
     }
 
-    // analyzeCircularDependencies 分析循环依赖
-    public List<String> analyzeCircularDependencies(CompilationUnit cu) {
-        List<String> issues = new ArrayList<>();
+    // 分析循环依赖，返回List<Issue>
+    public List<Issue> analyzeCircularDependencies(CompilationUnit cu) {
+        List<Issue> issues = new ArrayList<>();
+        String filePath = (String) cu.getProperty("filePath");
 
-        // 获取当前包名（相当于 Go 的 file.Name.Name）
         PackageDeclaration pkgDecl = cu.getPackage();
         if (pkgDecl == null) {
-            return issues; // 无包声明则直接返回
+            return issues;
         }
         String packageName = pkgDecl.getName().getFullyQualifiedName();
 
-        // 遍历所有 import 声明
         for (Object obj : cu.imports()) {
             if (obj instanceof ImportDeclaration imp) {
                 String importName = imp.getName().getFullyQualifiedName();
-
-                // 判断是否包含包名（类似 strings.Contains）
                 if (importName.contains(packageName)) {
-                    issues.add(String.format(
-                            "可能存在循环引用: %s 引用了包含自身名称的包 %s",
-                            packageName, importName
-                    ));
+                    Issue issue = new Issue();
+                    issue.setFile(filePath);
+                    issue.setLine(cu.getLineNumber(imp.getStartPosition()));  // 导入语句行号
+                    issue.setType("circular_dependency");  // 问题类型：循环依赖
+                    issue.setSeverity("major");  // 严重程度：主要
+                    issue.setMessage(String.format("可能存在循环引用: %s 引用了包含自身包 %s", packageName, importName));
+                    issue.setSuggestion("检查包依赖关系，避免相互引用或拆分依赖模块");
+                    issues.add(issue);
                 }
             }
         }
@@ -192,33 +204,36 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
         return issues;
     }
 
-    // analyzeImportComplexity 分析导入复杂度
-    public List<String> analyzeImportComplexity(CompilationUnit cu) {
-        List<String> issues = new ArrayList<>();
-
+    // 分析导入复杂度，返回List<Issue>
+    public List<Issue> analyzeImportComplexity(CompilationUnit cu) {
+        List<Issue> issues = new ArrayList<>();
+        String filePath = (String) cu.getProperty("filePath");
         int importCount = cu.imports().size();
 
         if (importCount > 20) {
-            issues.add(String.format(
-                    "导入包数量过多 (%d)，考虑拆分文件或重构", importCount
-            ));
+            Issue issue = new Issue();
+            issue.setFile(filePath);
+            issue.setLine(1);  // 导入通常在文件顶部，行号设为1
+            issue.setType("import_complexity");  // 问题类型：导入复杂度
+            issue.setSeverity("major");
+            issue.setMessage(String.format("导入包数量过多 (%d)", importCount));
+            issue.setSuggestion("考虑拆分文件或移除不必要的导入，降低模块耦合度");
+            issues.add(issue);
         } else if (importCount > 15) {
-            issues.add(String.format(
-                    "导入包数量较多 (%d)，建议检查是否需要全部导入", importCount
-            ));
+            Issue issue = new Issue();
+            issue.setFile(filePath);
+            issue.setLine(1);
+            issue.setType("import_complexity");
+            issue.setSeverity("medium");
+            issue.setMessage(String.format("导入包数量较多 (%d)", importCount));
+            issue.setSuggestion("检查是否有冗余导入，可使用通配符或拆分到多个文件");
+            issues.add(issue);
         }
 
         return issues;
     }
 
-    /**
-     * 计算结构得分
-     *
-     * @param nestingDepth     嵌套深度
-     * @param circularCount    循环依赖数量
-     * @param importIssueCount 导入问题数量
-     * @return 综合结构得分（0.0-1.0）
-     */
+    // 计算结构得分（保持不变）
     public double calculateScore(int nestingDepth, int circularCount, int importIssueCount) {
         // 嵌套深度分数
         double nestingScore = 0.4;

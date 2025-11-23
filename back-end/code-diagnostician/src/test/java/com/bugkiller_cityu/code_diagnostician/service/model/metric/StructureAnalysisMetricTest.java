@@ -1,5 +1,6 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
+import com.bugkiller_cityu.code_diagnostician.entity.Issue;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.CompilationUnit;
@@ -36,7 +37,7 @@ class StructureAnalysisMetricTest extends BasicMetricTest{
 
         StructureAnalysisMetric metric = new StructureAnalysisMetric();
         int[] maxDepthRef = {0};
-        List<String> issues = metric.analyzeNestingDepth(cu, maxDepthRef);
+        List<Issue> issues = metric.analyzeNestingDepth(cu, maxDepthRef);
 
         System.out.println("Max Depth: " + maxDepthRef[0]);
         issues.forEach(System.out::println);
@@ -60,7 +61,7 @@ class StructureAnalysisMetricTest extends BasicMetricTest{
         CompilationUnit cu = (CompilationUnit) parser.createAST(null);
 
         StructureAnalysisMetric metric = new StructureAnalysisMetric();
-        List<String> issues = metric.analyzeCircularDependencies(cu);
+        List<Issue> issues = metric.analyzeCircularDependencies(cu);
 
         issues.forEach(System.out::println);
     }
@@ -102,7 +103,7 @@ class StructureAnalysisMetricTest extends BasicMetricTest{
         CompilationUnit cu = (CompilationUnit) parser.createAST(null);
 
         StructureAnalysisMetric metric = new StructureAnalysisMetric();
-        List<String> issues = metric.analyzeImportComplexity(cu);
+        List<Issue> issues = metric.analyzeImportComplexity(cu);
 
         issues.forEach(System.out::println);
     }

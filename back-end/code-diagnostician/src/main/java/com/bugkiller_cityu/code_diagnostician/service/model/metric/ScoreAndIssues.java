@@ -1,5 +1,6 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
+import com.bugkiller_cityu.code_diagnostician.entity.Issue;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -11,5 +12,5 @@ import java.util.List;
 @AllArgsConstructor
 public class ScoreAndIssues {
     private double score;
-    private List<String> issues;
+    private List<Issue> issues;
 }

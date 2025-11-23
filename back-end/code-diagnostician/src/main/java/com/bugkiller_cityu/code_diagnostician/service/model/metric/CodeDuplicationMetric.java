@@ -1,5 +1,6 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
+import com.bugkiller_cityu.code_diagnostician.entity.Issue;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
 import lombok.Getter;
 import lombok.Setter;
@@ -28,7 +29,7 @@ public class CodeDuplicationMetric extends BaseMetric implements Metric{
 
     public MetricResult analyze(ParseResult parseResult) {
         JavaASTInfo javaASTInfo = JavaASTExtractor.extractJavaAST(parseResult);
-        List<String> issues = new ArrayList<>();
+        List<Issue> issues = new ArrayList<>();  // 改为Issue类型列表
         if (javaASTInfo == null){
             return new MetricResult(
                     0.35,
@@ -37,10 +38,12 @@ public class CodeDuplicationMetric extends BaseMetric implements Metric{
                     this.getWeight()
             );
         }
-        Map<String, List<String>> similarFunctions = new HashMap<>();
+        Map<String, List<MethodDeclaration>> similarFunctions = new HashMap<>();  // 存储方法声明便于获取行号等信息
         int totalFunctions = 0;
 
         CompilationUnit cu = javaASTInfo.getCompilationUnit();
+        String filePath = (String) cu.getProperty("filePath");
+//        String filePath = parseResult.getFilePath();  // 假设ParseResult有获取文件路径的方法
 
         // 遍历所有类型声明（类、接口等）
         for (Object typeObj : cu.types()) {
@@ -58,13 +61,13 @@ public class CodeDuplicationMetric extends BaseMetric implements Metric{
 
                     similarFunctions
                             .computeIfAbsent(signature, k -> new ArrayList<>())
-                            .add(methodDecl.getName().getIdentifier());
+                            .add(methodDecl);  // 存储方法声明而非仅方法名
                 }
             }
         }
 
         // 查找重复函数
-        int duplicatedCount = findDuplicatedFunctions(similarFunctions, issues);
+        int duplicatedCount = findDuplicatedFunctions(similarFunctions, issues, filePath, cu);
 
         // 如果函数数量太少，返回低分
         if (totalFunctions < 3) {
@@ -87,30 +90,49 @@ public class CodeDuplicationMetric extends BaseMetric implements Metric{
                 this.getWeight()
         );
     }
+
     /**
-     * 查找重复函数并生成问题列表
+     * 查找重复函数并生成Issue列表
      *
-     * @param similarFunctions 键为函数签名，值为相似函数列表
-     * @param issues           存储问题描述的列表
+     * @param similarFunctions 键为函数签名，值为相似方法声明列表
+     * @param issues           存储Issue对象的列表
+     * @param filePath         代码文件路径
+     * @param cu               编译单元（用于计算行号）
      * @return 重复函数的数量
      */
-    public int findDuplicatedFunctions(Map<String, List<String>> similarFunctions, List<String> issues) {
+    public int findDuplicatedFunctions(Map<String, List<MethodDeclaration>> similarFunctions,
+                                       List<Issue> issues,
+                                       String filePath,
+                                       CompilationUnit cu) {
         int duplicatedCount = 0;
 
-        for (Map.Entry<String, List<String>> entry : similarFunctions.entrySet()) {
+        for (Map.Entry<String, List<MethodDeclaration>> entry : similarFunctions.entrySet()) {
             String signature = entry.getKey();
-            List<String> functions = entry.getValue();
+            List<MethodDeclaration> functions = entry.getValue();
 
             // 忽略太短的函数签名
             if (functions.size() > 1 && signature.length() > 10) {
                 duplicatedCount += functions.size() - 1;
 
                 // 拼接函数名列表
-                String joinedFunctions = String.join(", ", functions);
-
-                // 添加问题描述
+                List<String> functionNames = functions.stream()
+                        .map(m -> m.getName().getIdentifier())
+                        .toList();
+                String joinedFunctions = String.join(", ", functionNames);
                 String issueMsg = String.format("可能存在重复实现: %s", joinedFunctions);
-                issues.add(issueMsg);
+
+                // 创建Issue对象
+                Issue issue = new Issue();
+                issue.setType("code_duplication");  // 问题类型：代码重复
+                issue.setSeverity("medium");  // 严重程度：中等（可根据实际情况调整）
+                issue.setFile(filePath);  // 设置文件路径
+                // 取第一个重复方法的行号作为问题行号
+                int startPos = functions.get(0).getStartPosition();
+                issue.setLine(cu.getLineNumber(startPos));  // 计算行号
+                issue.setMessage(issueMsg);  // 问题描述
+                issue.setSuggestion("建议抽象重复逻辑，提取为公共方法以减少代码冗余，提高可维护性");  // 优化建议
+
+                issues.add(issue);
             }
         }
 
@@ -161,7 +183,7 @@ public class CodeDuplicationMetric extends BaseMetric implements Metric{
 
             @Override
             public boolean visit(EnhancedForStatement node) {
-                signature.append("range"); // 对应 Go 的 RangeStmt
+                signature.append("range");
                 return true;
             }
 

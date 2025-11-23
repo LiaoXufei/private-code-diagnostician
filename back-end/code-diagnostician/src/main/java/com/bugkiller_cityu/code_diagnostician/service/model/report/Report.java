@@ -1,5 +1,6 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.report;
 
+import com.bugkiller_cityu.code_diagnostician.entity.Issue;
 import com.bugkiller_cityu.code_diagnostician.service.model.analyzer.Analyzer;
 import com.bugkiller_cityu.code_diagnostician.service.model.analyzer.Analyzer.AnalysisResult;
 import com.bugkiller_cityu.code_diagnostician.service.model.analyzer.Analyzer.FileAnalysisResult;
@@ -273,10 +274,20 @@ public class Report {
                 t("report.verbose.files"), result.getFilesAnalyzed().size());
     }
 
-    private List<String> takeIssues(List<String> issues, int maxIssues) {
+    private List<String> takeIssues(List<Issue> issues, int maxIssues) {
         if (issues == null || issues.isEmpty()) return List.of(t("report.issues.none"));
-        int n = Math.min(Math.max(1, maxIssues), issues.size());
-        return new ArrayList<>(issues.subList(0, n));
+        int takeCount = Math.min(Math.max(1, maxIssues), issues.size());
+        // 截取前N个问题并转换为字符串（基于Issue的message属性，可根据需要调整格式）
+        return issues.subList(0, takeCount).stream()
+                .map(issue -> {
+                    // 构建包含关键信息的字符串，可根据需求调整格式
+                    String file = issue.getFile() != null ? issue.getFile() : "未知文件";
+                    Integer line = issue.getLine();
+                    String lineStr = line != null ? String.valueOf(line) : "未知行号";
+                    return String.format("[%s] %s:%s - %s",
+                            issue.getSeverity(), file, lineStr, issue.getMessage());
+                })
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     private String sectionTitle(String text) {

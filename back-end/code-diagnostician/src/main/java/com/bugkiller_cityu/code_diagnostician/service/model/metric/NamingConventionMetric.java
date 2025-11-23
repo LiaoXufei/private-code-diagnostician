@@ -1,5 +1,6 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
+import com.bugkiller_cityu.code_diagnostician.entity.Issue;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
 import org.eclipse.jdt.core.dom.*;
 
@@ -14,6 +15,7 @@ import java.util.List;
 public class NamingConventionMetric extends BaseMetric implements Metric {
     private int totalNames;
     private int badNames;
+
     public NamingConventionMetric() {
         super(
                 "命名规范",
@@ -38,7 +40,7 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
         }
 
         CompilationUnit cu = astInfo.getCompilationUnit();
-        // 3 调用内部分析逻辑
+        // 3 调用内部分析逻辑（传入parseResult用于获取文件路径）
         ScoreAndIssues scoreAndIssues = analyzeNaming(cu);
 
         // 4 组装 MetricResult
@@ -52,9 +54,11 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
 
     /**
      * 命名规范分析逻辑（主核心）
+     * 修改为返回List<Issue>类型
      */
     private ScoreAndIssues analyzeNaming(CompilationUnit cu) {
-        List<String> issues = new ArrayList<>();
+        List<Issue> issues = new ArrayList<>();
+        String filePath = (String) cu.getProperty("filePath");
 
         if (cu == null) {
             return new ScoreAndIssues(0.0, issues);
@@ -66,7 +70,15 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
             totalNames++;
             String pkgName = pkg.getName().getFullyQualifiedName();
             if (!NamingRules.isValidPackageName(pkgName)) {
-                issues.add(String.format("包名 '%s' 不符合规范，应使用小写字母且不包含下划线。", pkgName));
+                // 创建包名问题的Issue对象
+                Issue issue = new Issue();
+                issue.setType("naming_convention");
+                issue.setSeverity("minor");
+                issue.setFile(filePath);
+                issue.setLine(cu.getLineNumber(pkg.getStartPosition())); // 获取行号
+                issue.setMessage(String.format("包名 '%s' 不符合规范，应使用小写字母且不包含下划线。", pkgName));
+                issue.setSuggestion("建议修改为全小写字母组成的包名，避免使用下划线或大写字母。");
+                issues.add(issue);
                 badNames++;
             }
         }
@@ -78,7 +90,14 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
                 totalNames++;
                 String name = node.getName().getIdentifier();
                 if (!NamingRules.isValidTypeName(name)) {
-                    issues.add(String.format("类型名 '%s' 不符合规范，应使用帕斯卡命名法（大写开头）。", name));
+                    Issue issue = new Issue();
+                    issue.setType("naming_convention");
+                    issue.setSeverity("minor");
+                    issue.setFile(filePath);
+                    issue.setLine(cu.getLineNumber(node.getStartPosition()));
+                    issue.setMessage(String.format("类型名 '%s' 不符合规范，应使用帕斯卡命名法（大写开头）。", name));
+                    issue.setSuggestion("建议修改为帕斯卡命名法，即首字母大写，后续每个单词首字母也大写（如：UserService）。");
+                    issues.add(issue);
                     badNames++;
                 }
                 return super.visit(node);
@@ -89,7 +108,14 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
                 totalNames++;
                 String name = node.getName().getIdentifier();
                 if (!NamingRules.isValidFuncName(name)) {
-                    issues.add(String.format("方法名 '%s' 不符合规范，应使用小驼峰命名法（小写开头）。", name));
+                    Issue issue = new Issue();
+                    issue.setType("naming_convention");
+                    issue.setSeverity("minor");
+                    issue.setFile(filePath);
+                    issue.setLine(cu.getLineNumber(node.getStartPosition()));
+                    issue.setMessage(String.format("方法名 '%s' 不符合规范，应使用小驼峰命名法（小写开头）。", name));
+                    issue.setSuggestion("建议修改为小驼峰命名法，即首字母小写，后续每个单词首字母大写（如：getUserInfo）。");
+                    issues.add(issue);
                     badNames++;
                 }
                 return super.visit(node);
@@ -101,12 +127,26 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
                 String name = node.getName().getIdentifier();
                 if (isConstant(node)) {
                     if (!NamingRules.isValidConstName(name)) {
-                        issues.add(String.format("常量名 '%s' 不符合规范，应使用全大写加下划线或帕斯卡命名法。", name));
+                        Issue issue = new Issue();
+                        issue.setType("naming_convention");
+                        issue.setSeverity("minor");
+                        issue.setFile(filePath);
+                        issue.setLine(cu.getLineNumber(node.getStartPosition()));
+                        issue.setMessage(String.format("常量名 '%s' 不符合规范，应使用全大写加下划线。", name));
+                        issue.setSuggestion("建议修改为全大写字母，单词间用下划线分隔（如：MAX_COUNT）。");
+                        issues.add(issue);
                         badNames++;
                     }
                 } else {
                     if (!NamingRules.isValidVarName(name)) {
-                        issues.add(String.format("变量名 '%s' 不符合规范，应使用小驼峰或小写命名。", name));
+                        Issue issue = new Issue();
+                        issue.setType("naming_convention");
+                        issue.setSeverity("minor");
+                        issue.setFile(filePath);
+                        issue.setLine(cu.getLineNumber(node.getStartPosition()));
+                        issue.setMessage(String.format("变量名 '%s' 不符合规范，应使用小驼峰命名法。", name));
+                        issue.setSuggestion("建议修改为小驼峰命名法，即首字母小写，后续每个单词首字母大写（如：userName）。");
+                        issues.add(issue);
                         badNames++;
                     }
                 }
@@ -123,12 +163,12 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
             }
         });
 
-        //  无命名项情况
+        // 无命名项情况
         if (totalNames == 0) {
             return new ScoreAndIssues(0.0, issues);
         }
 
-        //  计算比例与得分
+        // 计算比例与得分
         double badRatio = (double) badNames / totalNames;
         double score = calculateScore(badRatio);
 
@@ -145,4 +185,3 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
         return Math.min(score, 1.0);
     }
 }
-

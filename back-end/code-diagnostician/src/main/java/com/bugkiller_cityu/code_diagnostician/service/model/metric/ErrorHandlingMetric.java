@@ -1,5 +1,6 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
+import com.bugkiller_cityu.code_diagnostician.entity.Issue;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
 import lombok.Getter;
 import lombok.Setter;
@@ -27,7 +28,9 @@ public class ErrorHandlingMetric extends BaseMetric implements Metric {
         }
 
         CompilationUnit cu = astInfo.getCompilationUnit();
-        ScoreAndIssues result = analyzeErrorHandling(cu);
+        // 获取当前分析的文件路径
+        String filePath = (String) cu.getProperty("filePath");
+        ScoreAndIssues result = analyzeErrorHandling(cu, filePath);
 
         return new MetricResult(
                 result.getScore(),
@@ -38,19 +41,17 @@ public class ErrorHandlingMetric extends BaseMetric implements Metric {
     }
 
     /**
-     * 主体分析函数
+     * 主体分析函数，增加文件路径参数
      */
-    private ScoreAndIssues analyzeErrorHandling(CompilationUnit cu) {
-        List<String> issues = new ArrayList<>();
+    private ScoreAndIssues analyzeErrorHandling(CompilationUnit cu, String filePath) {
+        List<Issue> issues = new ArrayList<>();  // 改为List<Issue>类型
 
-        // 使用 AtomicInteger 来解决匿名类中的变量修改问题
         AtomicInteger totalErrorRelatedMethods = new AtomicInteger(0);
         AtomicInteger ignoredErrors = new AtomicInteger(0);
 
         cu.accept(new ASTVisitor() {
             @Override
             public boolean visit(MethodDeclaration node) {
-                // 检查是否 throws 异常
                 if (!node.thrownExceptionTypes().isEmpty()) {
                     totalErrorRelatedMethods.incrementAndGet();
                 }
@@ -59,7 +60,6 @@ public class ErrorHandlingMetric extends BaseMetric implements Metric {
 
             @Override
             public boolean visit(TryStatement node) {
-                // 检查是否存在空的 catch 块或未使用异常变量
                 for (Object obj : node.catchClauses()) {
                     CatchClause cc = (CatchClause) obj;
                     String varName = cc.getException().getName().getIdentifier();
@@ -73,7 +73,15 @@ public class ErrorHandlingMetric extends BaseMetric implements Metric {
                     }
                     if (!used) {
                         int line = cu.getLineNumber(cc.getStartPosition());
-                        issues.add(String.format("第 %d 行: 捕获异常但未处理 (变量 '%s' 未被使用)", line, varName));
+                        // 创建Issue对象并设置属性
+                        Issue issue = new Issue();
+                        issue.setType("error_handling");
+                        issue.setSeverity("major");  // 未处理异常属于较严重问题
+                        issue.setFile(filePath);
+                        issue.setLine(line);
+                        issue.setMessage(String.format("捕获异常但未处理 (变量 '%s' 未被使用)", varName));
+                        issue.setSuggestion("应处理捕获的异常，如记录日志、修复错误或根据业务逻辑重新抛出");
+                        issues.add(issue);
                         ignoredErrors.incrementAndGet();
                     }
                 }
@@ -84,10 +92,17 @@ public class ErrorHandlingMetric extends BaseMetric implements Metric {
             public boolean visit(MethodInvocation node) {
                 String name = node.getName().getIdentifier();
 
-                // 如果调用的是高风险 API 且不在 try 块中
                 if (isRiskyCall(name) && !isInsideTry(node)) {
                     int line = cu.getLineNumber(node.getStartPosition());
-                    issues.add(String.format("第 %d 行: 调用可能抛出异常的方法 '%s' 但未使用 try-catch", line, name));
+                    // 创建Issue对象并设置属性
+                    Issue issue = new Issue();
+                    issue.setType("error_handling");
+                    issue.setSeverity("major");  // 未捕获风险方法异常属于较严重问题
+                    issue.setFile(filePath);
+                    issue.setLine(line);
+                    issue.setMessage(String.format("调用可能抛出异常的方法 '%s' 但未使用 try-catch", name));
+                    issue.setSuggestion("应对可能抛出异常的方法调用添加try-catch块，妥善处理异常情况");
+                    issues.add(issue);
                     ignoredErrors.incrementAndGet();
                 }
                 return super.visit(node);
@@ -116,7 +131,6 @@ public class ErrorHandlingMetric extends BaseMetric implements Metric {
             }
         });
 
-        // 如果没有检测到与异常相关的函数，不评分
         if (totalErrorRelatedMethods.get() == 0) {
             return new ScoreAndIssues(0.0, issues);
         }
@@ -125,12 +139,6 @@ public class ErrorHandlingMetric extends BaseMetric implements Metric {
         return new ScoreAndIssues(score, issues);
     }
 
-    /**
-     * 与 Go 版本一致的计分逻辑：
-     * baseScore = 0.4
-     * score = baseScore + (ignoredErrors / totalErrorReturns) * 10
-     * capped to 1.0
-     */
     private double calculateScore(int ignoredErrors, int totalErrorReturns) {
         if (totalErrorReturns == 0) return 0.4;
 

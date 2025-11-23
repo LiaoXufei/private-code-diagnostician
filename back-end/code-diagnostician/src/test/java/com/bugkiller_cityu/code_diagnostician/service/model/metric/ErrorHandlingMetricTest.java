@@ -19,9 +19,9 @@ class ErrorHandlingMetricTest extends BasicMetricTest {
     private static ScoreAndIssues invokeAnalyze(CompilationUnit cu) {
         try {
             ErrorHandlingMetric analyzer = new ErrorHandlingMetric();
-            var method = ErrorHandlingMetric.class.getDeclaredMethod("analyzeErrorHandling", CompilationUnit.class);
+            var method = ErrorHandlingMetric.class.getDeclaredMethod("analyzeErrorHandling", CompilationUnit.class, String.class);
             method.setAccessible(true);
-            return (ScoreAndIssues) method.invoke(analyzer, cu);
+            return (ScoreAndIssues) method.invoke(analyzer, cu, "");
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -52,7 +52,7 @@ class ErrorHandlingMetricTest extends BasicMetricTest {
 
         assertNotNull(result);
         assertFalse(result.getIssues().isEmpty(), "应检测到未使用异常变量的违规情况");
-        assertTrue(result.getIssues().get(0).contains("捕获异常但未处理"));
+        assertTrue(result.getIssues().get(0).getMessage().contains("捕获异常但未处理"));
     }
 
     /**

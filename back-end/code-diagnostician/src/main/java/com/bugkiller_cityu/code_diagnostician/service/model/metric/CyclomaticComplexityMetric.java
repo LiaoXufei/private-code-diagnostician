@@ -1,5 +1,6 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
+import com.bugkiller_cityu.code_diagnostician.entity.Issue;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
 import lombok.Getter;
 import lombok.Setter;
@@ -31,7 +32,9 @@ public class CyclomaticComplexityMetric extends BaseMetric implements Metric {
             return new MetricResult(0.0, new ArrayList<>(), this.getDescription(), this.getWeight());
         }
 
-        ScoreAndIssues scoreAndIssues = analyzeComplexity(astInfo);
+        CompilationUnit cu = astInfo.getCompilationUnit();
+        String filePath = (String) cu.getProperty("filePath");
+        ScoreAndIssues scoreAndIssues = analyzeComplexity(astInfo, filePath);
         return new MetricResult(
                 scoreAndIssues.getScore(),
                 scoreAndIssues.getIssues(),
@@ -40,8 +43,8 @@ public class CyclomaticComplexityMetric extends BaseMetric implements Metric {
         );
     }
 
-    private ScoreAndIssues analyzeComplexity(JavaASTInfo astInfo) {
-        List<String> issues = new ArrayList<>();
+    private ScoreAndIssues analyzeComplexity(JavaASTInfo astInfo, String filePath) {
+        List<Issue> issues = new ArrayList<>();
         CompilationUnit cu = astInfo.getCompilationUnit();
 
         // 使用线程安全的累加器
@@ -54,14 +57,31 @@ public class CyclomaticComplexityMetric extends BaseMetric implements Metric {
             public boolean visit(MethodDeclaration node) {
                 int complexity = calculateComplexity(node);
                 String funcName = node.getName().getIdentifier();
+                // 获取方法所在行号（1-based）
+                int lineNumber = cu.getLineNumber(node.getStartPosition());
 
                 funcCount.incrementAndGet();
                 totalComplexity.add(complexity);
 
+                // 根据复杂度创建不同严重程度的Issue
                 if (complexity > 15) {
-                    issues.add(String.format("函数 '%s' 圈复杂度过高 (%d)，应尽快重构以降低逻辑分支。", funcName, complexity));
+                    issues.add(createIssue(
+                            filePath,
+                            lineNumber,
+                            funcName,
+                            complexity,
+                            "critical",
+                            "函数圈复杂度过高，应尽快重构以降低逻辑分支，可考虑拆分函数或使用多态等设计模式优化。"
+                    ));
                 } else if (complexity > 10) {
-                    issues.add(String.format("函数 '%s' 圈复杂度偏高 (%d)，建议优化控制结构。", funcName, complexity));
+                    issues.add(createIssue(
+                            filePath,
+                            lineNumber,
+                            funcName,
+                            complexity,
+                            "major",
+                            "函数圈复杂度偏高，建议优化控制结构，减少条件判断数量，提高代码可读性和可维护性。"
+                    ));
                 }
                 return super.visit(node);
             }
@@ -76,6 +96,27 @@ public class CyclomaticComplexityMetric extends BaseMetric implements Metric {
         double score = calculateComplexityScore(avgComplexity);
 
         return new ScoreAndIssues(score, issues);
+    }
+
+    /**
+     * 创建Issue对象
+     */
+    private Issue createIssue(String file, int line, String funcName, int complexity, String severity, String suggestion) {
+        Issue issue = new Issue();
+        issue.setType("cyclomatic_complexity");
+        issue.setSeverity(severity);
+        issue.setFile(file);
+        issue.setLine(line);
+        String problem = "";
+        if(complexity > 15){
+            problem = "函数圈复杂度过高,";
+        } else if (complexity > 10) {
+            problem = "函数圈复杂度偏高,";
+        }
+        issue.setMessage(String.format("函数 '%s': %s 圈复杂度为 %d", funcName, problem, complexity));
+        issue.setSuggestion(suggestion);
+        // analysisId暂时留空，由上层分析逻辑设置
+        return issue;
     }
 
     /**
@@ -150,8 +191,6 @@ public class CyclomaticComplexityMetric extends BaseMetric implements Metric {
 
     /**
      * 根据平均复杂度计算得分（线性映射 —— 与 Go 版本一致的公式）
-     * score = baseScore + avgComplexity * increasePerLevel
-     * capped to 1.0
      */
     private double calculateComplexityScore(double avgComplexity) {
         double baseScore = 0.4;
@@ -161,4 +200,3 @@ public class CyclomaticComplexityMetric extends BaseMetric implements Metric {
         return Math.min(score, 1.0);
     }
 }
-

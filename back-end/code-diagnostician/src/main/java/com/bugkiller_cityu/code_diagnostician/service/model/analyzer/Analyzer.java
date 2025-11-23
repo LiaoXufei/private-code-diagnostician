@@ -1,5 +1,6 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.analyzer;
 
+import com.bugkiller_cityu.code_diagnostician.entity.Issue;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -107,17 +108,17 @@ public abstract class Analyzer {
         private double fileScore;
 
         // 问题列表
-        private List<String> issues = new ArrayList<>();
+        private List<Issue> issues = new ArrayList<>();
 
         // 带参数的构造函数（保留，因为需要null检查）
-        public FileAnalysisResult(String filePath, double fileScore, List<String> issues) {
+        public FileAnalysisResult(String filePath, double fileScore, List<Issue> issues) {
             this.filePath = filePath;
             this.fileScore = fileScore;
             this.issues = issues != null ? issues : new ArrayList<>();
         }
 
         // 添加问题
-        public void addIssue(String issue) {
+        public void addIssue(Issue issue) {
             this.issues.add(issue);
         }
     }
