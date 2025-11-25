@@ -1,6 +1,7 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
 import com.bugkiller_cityu.code_diagnostician.entity.Issue;
+import com.bugkiller_cityu.code_diagnostician.service.model.common.SeverityEnum;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
 import lombok.Getter;
 import lombok.Setter;
@@ -76,7 +77,7 @@ public class ErrorHandlingMetric extends BaseMetric implements Metric {
                         // 创建Issue对象并设置属性
                         Issue issue = new Issue();
                         issue.setType("error_handling");
-                        issue.setSeverity("major");  // 未处理异常属于较严重问题
+                        issue.setSeverity(SeverityEnum.MEDIUM.getMessage());  // 未处理异常属于较严重问题
                         issue.setFile(filePath);
                         issue.setLine(line);
                         issue.setMessage(String.format("捕获异常但未处理 (变量 '%s' 未被使用)", varName));
@@ -97,7 +98,7 @@ public class ErrorHandlingMetric extends BaseMetric implements Metric {
                     // 创建Issue对象并设置属性
                     Issue issue = new Issue();
                     issue.setType("error_handling");
-                    issue.setSeverity("major");  // 未捕获风险方法异常属于较严重问题
+                    issue.setSeverity(SeverityEnum.MEDIUM.getMessage());  // 未捕获风险方法异常属于较严重问题
                     issue.setFile(filePath);
                     issue.setLine(line);
                     issue.setMessage(String.format("调用可能抛出异常的方法 '%s' 但未使用 try-catch", name));

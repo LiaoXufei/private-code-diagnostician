@@ -1,6 +1,7 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
 import com.bugkiller_cityu.code_diagnostician.entity.Issue;
+import com.bugkiller_cityu.code_diagnostician.service.model.common.SeverityEnum;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.Function;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
 import lombok.Getter;
@@ -70,7 +71,7 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
             if (lineCount > 120) {
                 Issue issue = createIssue(
                         "function_length",
-                        "critical",
+                        SeverityEnum.HIGH.getMessage(),
                         filePath,
                         startLine,
                         String.format("函数 '%s' 极度过长 (%d 行)", fn.getName(), lineCount),
@@ -81,7 +82,7 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
             } else if (lineCount > 70) {
                 Issue issue = createIssue(
                         "function_length",
-                        "major",
+                        SeverityEnum.MEDIUM.getMessage(),
                         filePath,
                         startLine,
                         String.format("函数 '%s' 过长 (%d 行)", fn.getName(), lineCount),
@@ -92,7 +93,7 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
             } else if (lineCount > 40) {
                 Issue issue = createIssue(
                         "function_length",
-                        "medium",
+                        SeverityEnum.LOW.getMessage(),
                         filePath,
                         startLine,
                         String.format("函数 '%s' 较长 (%d 行)", fn.getName(), lineCount),
@@ -108,7 +109,7 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
             if (complexity > 18) {
                 Issue issue = createIssue(
                         "complexity",
-                        "critical",
+                        SeverityEnum.HIGH.getMessage(),
                         filePath,
                         startLine,
                         String.format("函数 '%s' 复杂度严重过高 (%d)", fn.getName(), complexity),
@@ -118,7 +119,7 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
             } else if (complexity > 12) {
                 Issue issue = createIssue(
                         "complexity",
-                        "major",
+                        SeverityEnum.MEDIUM.getMessage(),
                         filePath,
                         startLine,
                         String.format("函数 '%s' 复杂度过高 (%d)", fn.getName(), complexity),
@@ -132,7 +133,7 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
             if (paramCount > 8) {
                 Issue issue = createIssue(
                         "parameter_count",
-                        "critical",
+                        SeverityEnum.MEDIUM.getMessage(),
                         filePath,
                         startLine,
                         String.format("函数 '%s' 参数极多 (%d 个)", fn.getName(), paramCount),
@@ -142,7 +143,7 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
             } else if (paramCount > 6) {
                 Issue issue = createIssue(
                         "parameter_count",
-                        "major",
+                        SeverityEnum.LOW.getMessage(),
                         filePath,
                         startLine,
                         String.format("函数 '%s' 参数过多 (%d 个)", fn.getName(), paramCount),
@@ -209,7 +210,7 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
 
                                 Issue issue = createIssue(
                                         "state_management",
-                                        "medium",
+                                        SeverityEnum.MEDIUM.getMessage(),
                                         filePath,
                                         lineNum,
                                         String.format("全局变量 '%s' 可能导致状态难以追踪", varName),
@@ -239,7 +240,7 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
                                 String paramName = param.getName().getIdentifier();
                                 Issue issue = createIssue(
                                         "state_management",
-                                        "medium",
+                                        SeverityEnum.LOW.getMessage(),
                                         filePath,
                                         cu.getLineNumber(param.getStartPosition()),
                                         String.format("函数 '%s' 的引用类型参数 '%s' 可能导致状态被外部修改", funcName, paramName),
@@ -265,7 +266,7 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
                                 if (info != null && !info.isMutable) {
                                     Issue issue = createIssue(
                                             "state_management",
-                                            "major",
+                                            SeverityEnum.HIGH.getMessage(),
                                             filePath,
                                             cu.getLineNumber(assign.getStartPosition()),
                                             String.format("在函数 '%s' 中修改了不应变化的状态变量 '%s'", funcName, varName),

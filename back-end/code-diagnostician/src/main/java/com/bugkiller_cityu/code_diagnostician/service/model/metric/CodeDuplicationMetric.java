@@ -1,6 +1,7 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
 import com.bugkiller_cityu.code_diagnostician.entity.Issue;
+import com.bugkiller_cityu.code_diagnostician.service.model.common.SeverityEnum;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
 import lombok.Getter;
 import lombok.Setter;
@@ -124,7 +125,13 @@ public class CodeDuplicationMetric extends BaseMetric implements Metric{
                 // 创建Issue对象
                 Issue issue = new Issue();
                 issue.setType("code_duplication");  // 问题类型：代码重复
-                issue.setSeverity("medium");  // 严重程度：中等（可根据实际情况调整）
+                if (functions.size() > 10){
+                    issue.setSeverity(SeverityEnum.HIGH.getMessage());
+                } else if (functions.size() > 5){
+                    issue.setSeverity(SeverityEnum.MEDIUM.getMessage());
+                } else {
+                    issue.setSeverity(SeverityEnum.LOW.getMessage());
+                }
                 issue.setFile(filePath);  // 设置文件路径
                 // 取第一个重复方法的行号作为问题行号
                 int startPos = functions.get(0).getStartPosition();

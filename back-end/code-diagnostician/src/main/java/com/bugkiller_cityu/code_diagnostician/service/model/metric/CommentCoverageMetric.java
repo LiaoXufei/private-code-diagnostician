@@ -1,6 +1,7 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
 import com.bugkiller_cityu.code_diagnostician.entity.Issue;
+import com.bugkiller_cityu.code_diagnostician.service.model.common.SeverityEnum;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
 import org.eclipse.jdt.core.dom.*;
 
@@ -27,7 +28,7 @@ public class CommentCoverageMetric extends BaseMetric implements Metric {
             Issue issue = createBaseIssue(
                     filePath,
                     null,
-                    "critical",
+                    SeverityEnum.HIGH.getMessage(),
                     "无法解析AST",
                     "请检查代码语法是否正确"
             );
@@ -60,7 +61,7 @@ public class CommentCoverageMetric extends BaseMetric implements Metric {
             Issue issue = createBaseIssue(
                     filePath,
                     null,
-                    "major",
+                    SeverityEnum.HIGH.getMessage(),
                     String.format("注释覆盖率极低（%.2f%%），可读性较差。", commentRatio * 100),
                     "建议增加关键代码（如复杂逻辑、公共接口）的注释，提高代码可维护性。"
             );
@@ -69,7 +70,7 @@ public class CommentCoverageMetric extends BaseMetric implements Metric {
             Issue issue = createBaseIssue(
                     filePath,
                     null,
-                    "medium",
+                    SeverityEnum.MEDIUM.getMessage(),
                     String.format("注释覆盖率偏低（%.2f%%），建议增加必要注释。", commentRatio * 100),
                     "建议为核心方法、复杂算法和关键业务逻辑添加说明注释。"
             );
@@ -78,7 +79,7 @@ public class CommentCoverageMetric extends BaseMetric implements Metric {
             Issue issue = createBaseIssue(
                     filePath,
                     null,
-                    "minor",
+                    SeverityEnum.LOW.getMessage(),
                     String.format("注释覆盖率较高（%.2f%%），可能存在冗余注释。", commentRatio * 100),
                     "建议精简重复或不必要的注释，保持注释与代码的一致性。"
             );
@@ -94,7 +95,7 @@ public class CommentCoverageMetric extends BaseMetric implements Metric {
                     Issue issue = createBaseIssue(
                             filePath,
                             lineNumber,
-                            "medium",
+                            SeverityEnum.MEDIUM.getMessage(),
                             "公共类缺少文档注释：" + node.getName().getIdentifier(),
                             "建议添加Javadoc注释，说明类的功能、设计目的和使用场景。"
                     );
@@ -110,7 +111,7 @@ public class CommentCoverageMetric extends BaseMetric implements Metric {
                     Issue issue = createBaseIssue(
                             filePath,
                             lineNumber,
-                            "medium",
+                            SeverityEnum.MEDIUM.getMessage(),
                             "公共方法缺少文档注释：" + node.getName().getIdentifier(),
                             "建议添加Javadoc注释，说明方法功能、参数含义、返回值及异常情况。"
                     );

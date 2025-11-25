@@ -1,6 +1,7 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
 import com.bugkiller_cityu.code_diagnostician.entity.Issue;
+import com.bugkiller_cityu.code_diagnostician.service.model.common.SeverityEnum;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
 import org.eclipse.jdt.core.dom.*;
 
@@ -73,7 +74,7 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
                 // 创建包名问题的Issue对象
                 Issue issue = new Issue();
                 issue.setType("naming_convention");
-                issue.setSeverity("minor");
+                issue.setSeverity(SeverityEnum.LOW.getMessage());
                 issue.setFile(filePath);
                 issue.setLine(cu.getLineNumber(pkg.getStartPosition())); // 获取行号
                 issue.setMessage(String.format("包名 '%s' 不符合规范，应使用小写字母且不包含下划线。", pkgName));
@@ -92,7 +93,7 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
                 if (!NamingRules.isValidTypeName(name)) {
                     Issue issue = new Issue();
                     issue.setType("naming_convention");
-                    issue.setSeverity("minor");
+                    issue.setSeverity(SeverityEnum.LOW.getMessage());
                     issue.setFile(filePath);
                     issue.setLine(cu.getLineNumber(node.getStartPosition()));
                     issue.setMessage(String.format("类型名 '%s' 不符合规范，应使用帕斯卡命名法（大写开头）。", name));
@@ -110,7 +111,7 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
                 if (!NamingRules.isValidFuncName(name)) {
                     Issue issue = new Issue();
                     issue.setType("naming_convention");
-                    issue.setSeverity("minor");
+                    issue.setSeverity(SeverityEnum.LOW.getMessage());
                     issue.setFile(filePath);
                     issue.setLine(cu.getLineNumber(node.getStartPosition()));
                     issue.setMessage(String.format("方法名 '%s' 不符合规范，应使用小驼峰命名法（小写开头）。", name));
@@ -129,7 +130,7 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
                     if (!NamingRules.isValidConstName(name)) {
                         Issue issue = new Issue();
                         issue.setType("naming_convention");
-                        issue.setSeverity("minor");
+                        issue.setSeverity(SeverityEnum.MEDIUM.getMessage());
                         issue.setFile(filePath);
                         issue.setLine(cu.getLineNumber(node.getStartPosition()));
                         issue.setMessage(String.format("常量名 '%s' 不符合规范，应使用全大写加下划线。", name));
@@ -141,7 +142,7 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
                     if (!NamingRules.isValidVarName(name)) {
                         Issue issue = new Issue();
                         issue.setType("naming_convention");
-                        issue.setSeverity("minor");
+                        issue.setSeverity(SeverityEnum.LOW.getMessage());
                         issue.setFile(filePath);
                         issue.setLine(cu.getLineNumber(node.getStartPosition()));
                         issue.setMessage(String.format("变量名 '%s' 不符合规范，应使用小驼峰命名法。", name));

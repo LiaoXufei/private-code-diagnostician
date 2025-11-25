@@ -1,6 +1,7 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
 import com.bugkiller_cityu.code_diagnostician.entity.Issue;
+import com.bugkiller_cityu.code_diagnostician.service.model.common.SeverityEnum;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
 import lombok.Getter;
 import lombok.Setter;
@@ -70,7 +71,7 @@ public class CyclomaticComplexityMetric extends BaseMetric implements Metric {
                             lineNumber,
                             funcName,
                             complexity,
-                            "critical",
+                            SeverityEnum.MEDIUM.getMessage(),
                             "函数圈复杂度过高，应尽快重构以降低逻辑分支，可考虑拆分函数或使用多态等设计模式优化。"
                     ));
                 } else if (complexity > 10) {
@@ -79,7 +80,7 @@ public class CyclomaticComplexityMetric extends BaseMetric implements Metric {
                             lineNumber,
                             funcName,
                             complexity,
-                            "major",
+                            SeverityEnum.LOW.getMessage(),
                             "函数圈复杂度偏高，建议优化控制结构，减少条件判断数量，提高代码可读性和可维护性。"
                     ));
                 }

@@ -1,6 +1,7 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.metric;
 
 import com.bugkiller_cityu.code_diagnostician.entity.Issue;
+import com.bugkiller_cityu.code_diagnostician.service.model.common.SeverityEnum;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
 import lombok.Getter;
 import lombok.Setter;
@@ -83,12 +84,12 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
                 issue.setType("nesting_depth");  // 问题类型：嵌套深度
 
                 if (depth > 5) {
-                    issue.setSeverity("major");  // 严重程度：主要
+                    issue.setSeverity(SeverityEnum.HIGH.getMessage());  // 严重程度：高
                     issue.setMessage(String.format("函数 %s 的嵌套深度过高 (%d)", methodName, depth));
                     issue.setSuggestion("考虑重构函数，拆分复杂逻辑以降低嵌套层次");
                     issues.add(issue);
                 } else if (depth > 3) {
-                    issue.setSeverity("medium");  // 严重程度：中等
+                    issue.setSeverity(SeverityEnum.MEDIUM.getMessage());  // 严重程度：中等
                     issue.setMessage(String.format("函数 %s 的嵌套深度较高 (%d)", methodName, depth));
                     issue.setSuggestion("建议简化逻辑，减少条件判断或循环的嵌套层级");
                     issues.add(issue);
@@ -193,7 +194,7 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
                     issue.setFile(filePath);
                     issue.setLine(cu.getLineNumber(imp.getStartPosition()));  // 导入语句行号
                     issue.setType("circular_dependency");  // 问题类型：循环依赖
-                    issue.setSeverity("major");  // 严重程度：主要
+                    issue.setSeverity(SeverityEnum.HIGH.getMessage());  // 严重程度：主要
                     issue.setMessage(String.format("可能存在循环引用: %s 引用了包含自身包 %s", packageName, importName));
                     issue.setSuggestion("检查包依赖关系，避免相互引用或拆分依赖模块");
                     issues.add(issue);
@@ -215,7 +216,7 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
             issue.setFile(filePath);
             issue.setLine(1);  // 导入通常在文件顶部，行号设为1
             issue.setType("import_complexity");  // 问题类型：导入复杂度
-            issue.setSeverity("major");
+            issue.setSeverity(SeverityEnum.HIGH.getMessage());
             issue.setMessage(String.format("导入包数量过多 (%d)", importCount));
             issue.setSuggestion("考虑拆分文件或移除不必要的导入，降低模块耦合度");
             issues.add(issue);
@@ -224,7 +225,7 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
             issue.setFile(filePath);
             issue.setLine(1);
             issue.setType("import_complexity");
-            issue.setSeverity("medium");
+            issue.setSeverity(SeverityEnum.MEDIUM.getMessage());
             issue.setMessage(String.format("导入包数量较多 (%d)", importCount));
             issue.setSuggestion("检查是否有冗余导入，可使用通配符或拆分到多个文件");
             issues.add(issue);
