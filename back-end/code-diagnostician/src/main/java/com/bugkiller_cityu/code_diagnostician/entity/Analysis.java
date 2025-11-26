@@ -29,11 +29,11 @@ public class Analysis {
     private Instant createdAt;
 
     // 关联维度评分（OneToMany：一个分析包含多个维度）
-    @OneToMany(mappedBy = "analysisId", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "analysis", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Dimension> dimensions;
 
     // 关联问题列表（OneToMany：一个分析包含多个问题）
-    @OneToMany(mappedBy = "analysisId", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "analysis", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Issue> issues;
 
     // 级联删除：删除项目时删除关联分析
