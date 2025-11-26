@@ -8,7 +8,7 @@ public class ParserFactory {
     // Create parser based on language type
     public static Parser createParser(LanguageType language) {
         switch (language) {
-            case LanguageType.JAVA:
+            case JAVA:
                 return new JavaParser();
             default:
                 return new GenericParser();

@@ -270,92 +270,99 @@ public class ProjectController {
     @PostMapping("/projects/{id}/analyze")
     @Transactional
     public Map<String, Object> analyze(@PathVariable String id) {
-        Optional<Project> projectOpt = projectRepository.findById(id);
-        if (projectOpt.isEmpty()) {
-            return Map.<String, Object>of("error", "项目不存在");
-        }
-
-        Project project = projectOpt.get();
-
-        Analysis analysis = new Analysis();
-        analysis.setProjectId(id);
-        analysis.setOverallScore(0);
-        analysis.setGrade("good");
-        analysis.setCreatedAt(Instant.now());
-        Analysis savedAnalysis = analysisRepository.save(analysis);
-
-        List<ProjectFile> files = fileRepository.findByProjectId(id);
-        List<com.bugkiller_cityu.code_diagnostician.service.model.metric.AnalysisResult> fileResults = new ArrayList<>();
-        for (ProjectFile f : files) {
-            String storedName = Paths.get(f.getFilePath()).getFileName().toString();
-            Path abs = Paths.get("uploads").resolve(id).resolve(storedName);
-            if (Files.exists(abs)) {
-                try {
-                    com.bugkiller_cityu.code_diagnostician.service.model.metric.AnalysisResult r = codeAnalyzer.analyzeFile(abs.toString());
-                    fileResults.add(r);
-                } catch (Exception ignored) {}
+        try {
+            Optional<Project> projectOpt = projectRepository.findById(id);
+            if (projectOpt.isEmpty()) {
+                return Map.<String, Object>of("error", "项目不存在");
             }
-        }
 
-        double overall = fileResults.isEmpty() ? 0.0 : codeAnalyzer.calculateOverallScore(fileResults);
-        int overallInt = (int) Math.round(overall * 100.0);
-        String grade = overallInt >= 85 ? "excellent" : overallInt >= 70 ? "good" : "poor";
+            Project project = projectOpt.get();
 
-        Map<String, List<com.bugkiller_cityu.code_diagnostician.service.model.metric.MetricResult>> metricsMap = new LinkedHashMap<>();
-        for (var fr : fileResults) {
-            for (var e : fr.getMetricResults().entrySet()) {
-                metricsMap.computeIfAbsent(e.getKey(), k -> new ArrayList<>()).add(e.getValue());
-            }
-        }
+            Analysis analysis = new Analysis();
+            analysis.setProjectId(id);
+            analysis.setOverallScore(0);
+            analysis.setGrade("good");
+            analysis.setCreatedAt(Instant.now());
+            Analysis savedAnalysis = analysisRepository.save(analysis);
 
-        List<Dimension> dimensions = new ArrayList<>();
-        for (var entry : metricsMap.entrySet()) {
-            String name = entry.getKey();
-            List<com.bugkiller_cityu.code_diagnostician.service.model.metric.MetricResult> mrs = entry.getValue();
-            double avg = mrs.stream().mapToDouble(com.bugkiller_cityu.code_diagnostician.service.model.metric.MetricResult::getScore).average().orElse(0.0);
-            int issuesCount = mrs.stream().mapToInt(m -> m.getIssues() == null ? 0 : m.getIssues().size()).sum();
-            dimensions.add(createDimension(savedAnalysis.getId(), name, (int) Math.round(avg * 100.0), 100, issuesCount));
-        }
-        dimensionRepository.saveAll(dimensions);
-
-        List<Issue> allIssues = new ArrayList<>();
-        for (var fr : fileResults) {
-            if (fr.getIssues() != null) {
-                for (Issue is : fr.getIssues()) {
-                    is.setAnalysisId(savedAnalysis.getId());
-                    allIssues.add(is);
+            List<ProjectFile> files = fileRepository.findByProjectId(id);
+            List<com.bugkiller_cityu.code_diagnostician.service.model.metric.AnalysisResult> fileResults = new ArrayList<>();
+            for (ProjectFile f : files) {
+                String storedName = Paths.get(f.getFilePath()).getFileName().toString();
+                Path abs = Paths.get("uploads").resolve(id).resolve(storedName);
+                if (Files.exists(abs)) {
+                    try {
+                        com.bugkiller_cityu.code_diagnostician.service.model.metric.AnalysisResult r = codeAnalyzer.analyzeFile(abs.toString());
+                        fileResults.add(r);
+                    } catch (Exception ignored) {}
                 }
             }
+
+            double overall = fileResults.isEmpty() ? 0.0 : codeAnalyzer.calculateOverallScore(fileResults);
+            int overallInt = (int) Math.round(overall * 100.0);
+            String grade = overallInt >= 85 ? "excellent" : overallInt >= 70 ? "good" : "poor";
+
+            Map<String, List<com.bugkiller_cityu.code_diagnostician.service.model.metric.MetricResult>> metricsMap = new LinkedHashMap<>();
+            for (var fr : fileResults) {
+                if (fr.getMetricResults() == null) continue;
+                for (var e : fr.getMetricResults().entrySet()) {
+                    metricsMap.computeIfAbsent(e.getKey(), k -> new ArrayList<>()).add(e.getValue());
+                }
+            }
+
+            List<Dimension> dimensions = new ArrayList<>();
+            for (var entry : metricsMap.entrySet()) {
+                String name = entry.getKey();
+                List<com.bugkiller_cityu.code_diagnostician.service.model.metric.MetricResult> mrs = entry.getValue();
+                double avg = mrs.stream().mapToDouble(com.bugkiller_cityu.code_diagnostician.service.model.metric.MetricResult::getScore).average().orElse(0.0);
+                int issuesCount = mrs.stream().mapToInt(m -> m.getIssues() == null ? 0 : m.getIssues().size()).sum();
+                dimensions.add(createDimension(savedAnalysis.getId(), name, (int) Math.round(avg * 100.0), 100, issuesCount));
+            }
+            if (!dimensions.isEmpty()) dimensionRepository.saveAll(dimensions);
+
+            List<Issue> allIssues = new ArrayList<>();
+            for (var fr : fileResults) {
+                List<Issue> frIssues = fr.getIssues();
+                if (frIssues != null) {
+                    for (Issue is : frIssues) {
+                        if (is == null) continue;
+                        is.setAnalysisId(savedAnalysis.getId());
+                        allIssues.add(is);
+                    }
+                }
+            }
+            if (!allIssues.isEmpty()) issueRepository.saveAll(allIssues);
+
+            savedAnalysis.setOverallScore(overallInt);
+            savedAnalysis.setGrade(grade);
+            savedAnalysis.setDimensions(dimensions);
+            savedAnalysis.setIssues(allIssues);
+            analysisRepository.save(savedAnalysis);
+
+            project.setStatus("completed");
+            project.setLastAnalysisId(savedAnalysis.getId());
+            project.setUpdatedAt(Instant.now());
+            projectRepository.save(project);
+
+            List<Map<String, Object>> dimsOut = dimensions.stream().map(this::convertToMap).collect(Collectors.toList());
+            List<Map<String, Object>> issuesOut = allIssues.stream().map(this::convertToMap).collect(Collectors.toList());
+
+            return Map.of(
+                    "message", "分析完成",
+                    "analysisId", savedAnalysis.getId(),
+                    "result", Map.of(
+                            "id", savedAnalysis.getId(),
+                            "projectId", id,
+                            "overallScore", savedAnalysis.getOverallScore(),
+                            "grade", savedAnalysis.getGrade(),
+                            "dimensions", dimsOut,
+                            "issues", issuesOut,
+                            "created_at", savedAnalysis.getCreatedAt().toString()
+                    )
+            );
+        } catch (Exception e) {
+            return Map.of("error", "分析失败", "details", e.getMessage());
         }
-        if (!allIssues.isEmpty()) issueRepository.saveAll(allIssues);
-
-        savedAnalysis.setOverallScore(overallInt);
-        savedAnalysis.setGrade(grade);
-        savedAnalysis.setDimensions(dimensions);
-        savedAnalysis.setIssues(allIssues);
-        analysisRepository.save(savedAnalysis);
-
-        project.setStatus("completed");
-        project.setLastAnalysisId(savedAnalysis.getId());
-        project.setUpdatedAt(Instant.now());
-        projectRepository.save(project);
-
-        List<Map<String, Object>> dimsOut = dimensions.stream().map(this::convertToMap).collect(Collectors.toList());
-        List<Map<String, Object>> issuesOut = allIssues.stream().map(this::convertToMap).collect(Collectors.toList());
-
-        return Map.of(
-                "message", "分析完成",
-                "analysisId", savedAnalysis.getId(),
-                "result", Map.of(
-                        "id", savedAnalysis.getId(),
-                        "projectId", id,
-                        "overallScore", savedAnalysis.getOverallScore(),
-                        "grade", savedAnalysis.getGrade(),
-                        "dimensions", dimsOut,
-                        "issues", issuesOut,
-                        "created_at", savedAnalysis.getCreatedAt().toString()
-                )
-        );
     }
 
     @DeleteMapping("/projects/{id}/analyze")

@@ -23,7 +23,6 @@ public interface MetricService{
 
 @Service
 class MetricServiceImpl implements MetricService{
-    @Autowired
     private final Factory factory;
 
     public MetricServiceImpl(Factory factory){
