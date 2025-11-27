@@ -5,6 +5,9 @@ import com.bugkiller_cityu.code_diagnostician.repository.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -16,6 +19,15 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.nio.charset.StandardCharsets;
+import java.io.ByteArrayOutputStream;
+import com.vladsch.flexmark.parser.Parser;
+import com.vladsch.flexmark.util.ast.Node;
+import com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter;
+import com.vladsch.flexmark.html.HtmlRenderer;
+import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
+import com.bugkiller_cityu.code_diagnostician.service.model.report.Report;
+import com.bugkiller_cityu.code_diagnostician.service.model.analyzer.Analyzer;
 
 @CrossOrigin
 @RestController
@@ -28,6 +40,7 @@ public class ProjectController {
     private final DimensionRepository dimensionRepository;
     private final IssueRepository issueRepository;
     private final com.bugkiller_cityu.code_diagnostician.service.model.analyzer.Analyzer.CodeAnalyzer codeAnalyzer;
+    private final Report report;
 
     // -------------------------- 项目管理 --------------------------
     @GetMapping("/projects")
@@ -38,6 +51,159 @@ public class ProjectController {
                 .map(this::enrichProjectWithLastAnalysis)
                 .map(this::convertToMap)
                 .collect(Collectors.toList());
+    }
+
+    @GetMapping(value = "/projects/{id}/report.pdf")
+    public ResponseEntity<byte[]> exportProjectReportPdf(@PathVariable String id) {
+        Optional<Project> projectOpt = projectRepository.findById(id);
+        if (projectOpt.isEmpty()) {
+            return new ResponseEntity<>(new byte[0], HttpStatus.NOT_FOUND);
+        }
+        Project project = projectOpt.get();
+        Optional<Analysis> latestOpt = analysisRepository.findTopByProjectIdOrderByCreatedAtDesc(id);
+        int overall = latestOpt.map(Analysis::getOverallScore).orElse(0);
+        int totalLines = 0;
+        try {
+            List<ProjectFile> pfiles = fileRepository.findByProjectId(id);
+            for (ProjectFile pf : pfiles) {
+                String storedName = Paths.get(pf.getFilePath()).getFileName().toString();
+                Path abs = Paths.get("uploads").resolve(id).resolve(storedName);
+                if (Files.exists(abs)) {
+                    totalLines += (int) Files.lines(abs).count();
+                }
+            }
+        } catch (Exception ignored) {}
+        Analyzer.AnalysisResult ar = new Analyzer.AnalysisResult(
+                overall / 100.0,
+                new HashMap<>(),
+                new ArrayList<>(),
+                project.getFileCount(),
+                totalLines
+        );
+        latestOpt.ifPresent(latest -> {
+            List<Dimension> dims = latest.getDimensions() != null ? latest.getDimensions() : List.of();
+            for (Dimension d : dims) {
+                ar.addMetric(d.getName(), new Analyzer.MetricResult(
+                        d.getName(),
+                        Math.max(0.0, Math.min(1.0, d.getScore() / 100.0)),
+                        d.getName(),
+                        0.1
+                ));
+            }
+            List<Issue> issues = latest.getIssues() != null ? latest.getIssues() : List.of();
+            Map<String, List<Issue>> byFile = new LinkedHashMap<>();
+            for (Issue is : issues) {
+                String filePath = is.getFile() != null ? is.getFile() : "unknown";
+                byFile.computeIfAbsent(filePath, k -> new ArrayList<>()).add(is);
+            }
+            for (Map.Entry<String, List<Issue>> e : byFile.entrySet()) {
+                ar.addFileAnalysisResult(new Analyzer.FileAnalysisResult(
+                        e.getKey(),
+                        Math.max(0.0, Math.min(1.0, overall / 100.0)),
+                        e.getValue()
+                ));
+            }
+        });
+        Report.ReportOptions opts = new Report.ReportOptions();
+        opts.markdownOutput = true;
+        String md = report.generateReport(ar, opts);
+
+        Parser parser = Parser.builder().build();
+        Node document = parser.parse(md);
+        HtmlRenderer renderer = HtmlRenderer.builder().build();
+        String htmlBody = renderer.render(document);
+        StringBuilder sb = new StringBuilder();
+        sb.append("<!DOCTYPE html>\n");
+        sb.append("<html xmlns=\"http://www.w3.org/1999/xhtml\">\n");
+        sb.append("<head>\n");
+        sb.append("  <meta charset=\"utf-8\"/>\n");
+        sb.append("  <title>报告</title>\n");
+        sb.append("  <style>body{font-family:Arial,\"Microsoft YaHei\",sans-serif;padding:24px;line-height:1.6;} h1,h2,h3{margin:16px 0;} table{border-collapse:collapse;width:100%;} th,td{border:1px solid #ddd;padding:8px;} code,pre{background:#f6f8fa;padding:8px;border-radius:4px;} </style>\n");
+        sb.append("</head>\n");
+        sb.append("<body>\n");
+        sb.append(htmlBody);
+        sb.append("\n</body>\n</html>");
+        String fullHtml = sb.toString();
+
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            PdfRendererBuilder builder = new PdfRendererBuilder();
+            builder.useFastMode();
+            builder.withHtmlContent(fullHtml, null);
+            builder.toStream(baos);
+            builder.run();
+            byte[] pdf = baos.toByteArray();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=report-" + id + ".pdf");
+            return new ResponseEntity<>(pdf, headers, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(new byte[0], HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @GetMapping(value = "/projects/{id}/report.md")
+    public ResponseEntity<byte[]> exportProjectReportMarkdown(@PathVariable String id) {
+        Optional<Project> projectOpt = projectRepository.findById(id);
+        if (projectOpt.isEmpty()) {
+            return new ResponseEntity<>(new byte[0], HttpStatus.NOT_FOUND);
+        }
+        Project project = projectOpt.get();
+
+        Optional<Analysis> latestOpt = analysisRepository.findTopByProjectIdOrderByCreatedAtDesc(id);
+        int overall = latestOpt.map(Analysis::getOverallScore).orElse(0);
+        int totalLines = 0;
+        try {
+            List<ProjectFile> pfiles = fileRepository.findByProjectId(id);
+            for (ProjectFile pf : pfiles) {
+                String storedName = Paths.get(pf.getFilePath()).getFileName().toString();
+                Path abs = Paths.get("uploads").resolve(id).resolve(storedName);
+                if (Files.exists(abs)) {
+                    totalLines += (int) Files.lines(abs).count();
+                }
+            }
+        } catch (Exception ignored) {}
+        Analyzer.AnalysisResult ar = new Analyzer.AnalysisResult(
+                overall / 100.0,
+                new HashMap<>(),
+                new ArrayList<>(),
+                project.getFileCount(),
+                totalLines
+        );
+        latestOpt.ifPresent(latest -> {
+            List<Dimension> dims = latest.getDimensions() != null ? latest.getDimensions() : List.of();
+            for (Dimension d : dims) {
+                ar.addMetric(d.getName(), new Analyzer.MetricResult(
+                        d.getName(),
+                        Math.max(0.0, Math.min(1.0, d.getScore() / 100.0)),
+                        d.getName(),
+                        0.1
+                ));
+            }
+            List<Issue> issues = latest.getIssues() != null ? latest.getIssues() : List.of();
+            Map<String, List<Issue>> byFile = new LinkedHashMap<>();
+            for (Issue is : issues) {
+                String filePath = is.getFile() != null ? is.getFile() : "unknown";
+                byFile.computeIfAbsent(filePath, k -> new ArrayList<>()).add(is);
+            }
+            for (Map.Entry<String, List<Issue>> e : byFile.entrySet()) {
+                ar.addFileAnalysisResult(new Analyzer.FileAnalysisResult(
+                        e.getKey(),
+                        Math.max(0.0, Math.min(1.0, overall / 100.0)),
+                        e.getValue()
+                ));
+            }
+        });
+
+        Report.ReportOptions opts = new Report.ReportOptions();
+        opts.markdownOutput = true;
+        String md = report.generateReport(ar, opts);
+
+        byte[] bytes = md.getBytes(StandardCharsets.UTF_8);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.parseMediaType("text/markdown"));
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=report-" + id + ".md");
+        return new ResponseEntity<>(bytes, headers, HttpStatus.OK);
     }
 
     @PostMapping("/projects")
@@ -405,21 +571,70 @@ public class ProjectController {
                     .map(d -> String.format("优化%s相关代码", d.getName()))
                     .collect(Collectors.toList()));
 
-            return Map.of(
-                    "projectId", id,
-                    "projectName", project.getName(),
-                    "overallScore", analysis.getOverallScore(),
-                    "grade", analysis.getGrade(),
-                    "dimensions", analysis.getDimensions().stream().map(this::convertToMap).collect(Collectors.toList()),
-                    "issues", issues.stream().map(this::convertToMap).collect(Collectors.toList()),
-                    "completedAt", analysis.getCreatedAt().toString(),
-                    "taskId", analysis.getId(),
-                    "metrics", metrics,
-                    "summary", summary
-            );
+            List<Map<String, Object>> issuesOut = issues.stream().map(iss -> {
+                Map<String, Object> m = convertToMap(iss);
+                String raw = (String) m.get("file");
+                String friendly = toFriendlyFilename(id, raw);
+                m.put("file", friendly);
+                return m;
+            }).collect(Collectors.toList());
+
+            List<Map<String, Object>> fileResults = new ArrayList<>();
+            List<ProjectFile> pfiles = fileRepository.findByProjectId(id);
+            for (ProjectFile pf : pfiles) {
+                String stored = Paths.get(pf.getFilePath()).getFileName().toString();
+                Path abs = Paths.get("uploads").resolve(id).resolve(stored);
+                if (!Files.exists(abs)) continue;
+                try {
+                    com.bugkiller_cityu.code_diagnostician.service.model.metric.AnalysisResult r = codeAnalyzer.analyzeFile(abs.toString());
+                    int lines = r.getTotalLines();
+                    int issuesCount = r.getIssues() != null ? r.getIssues().size() : 0;
+                    int score = (int) Math.round(codeAnalyzer.calculateOverallScore(java.util.List.of(r)) * 100.0);
+                    int complexity = 0;
+                    var mr = r.getMetricResults().get("圈复杂度分析");
+                    if (mr != null && mr.getIssues() != null) complexity = mr.getIssues().size();
+                    Map<String, Object> fm = new LinkedHashMap<>();
+                    fm.put("file", pf.getFilename());
+                    fm.put("score", score);
+                    fm.put("issues", issuesCount);
+                    fm.put("linesOfCode", lines);
+                    fm.put("complexity", complexity);
+                    fileResults.add(fm);
+                } catch (Exception ignored) {}
+            }
+
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("projectId", id);
+            resp.put("projectName", project.getName());
+            resp.put("overallScore", analysis.getOverallScore());
+            resp.put("grade", analysis.getGrade());
+            resp.put("dimensions", analysis.getDimensions().stream().map(this::convertToMap).collect(Collectors.toList()));
+            resp.put("issues", issuesOut);
+            resp.put("fileResults", fileResults);
+            resp.put("completedAt", analysis.getCreatedAt().toString());
+            resp.put("taskId", analysis.getId());
+            resp.put("metrics", metrics);
+            resp.put("summary", summary);
+            return resp;
         } else {
             return Map.<String, Object>of("error", "该项目暂无分析结果");
         }
+    }
+
+    private String toFriendlyFilename(String projectId, String rawPath) {
+        if (rawPath == null || rawPath.isEmpty()) return "";
+        String stored = Paths.get(rawPath).getFileName().toString();
+        try {
+            List<ProjectFile> pfiles = fileRepository.findByProjectId(projectId);
+            for (ProjectFile pf : pfiles) {
+                String fp = Paths.get(pf.getFilePath()).getFileName().toString();
+                if (stored.equals(fp)) {
+                    return pf.getFilename();
+                }
+            }
+        } catch (Exception ignored) {}
+        int idx = stored.indexOf('_');
+        return idx >= 0 ? stored.substring(idx + 1) : stored;
     }
 
     @GetMapping("/projects/{id}/analysis/status")

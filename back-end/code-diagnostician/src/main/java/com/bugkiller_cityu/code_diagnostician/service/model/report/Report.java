@@ -69,49 +69,7 @@ public class Report {
     // 重要：生成报告主入口，返回可直接打印的字符串
     public String generateReport(AnalysisResult result, ReportOptions options) {
         if (options == null) options = new ReportOptions();
-        return options.markdownOutput ? generateMarkdownReport(result, options) : generateConsoleReport(result, options);
-    }
-
-    // 控制台报告（含可选 ANSI 颜色）
-    public String generateConsoleReport(AnalysisResult result, ReportOptions options) {
-        StringBuilder out = new StringBuilder();
-
-        printDivider(out);
-        out.append("\n  ").append(emoji("📣 ")).append(t("report.title")).append("\n");
-        printDivider(out);
-
-        double displayScore = clamp01(result.getCodeQualityScore()) * 100.0;
-        QualityLevel level = getQualityLevel(displayScore);
-
-        out.append("\n  ").append(t("report.overall_score", String.format(Locale.ROOT, "%.2f", displayScore))).append(" - ");
-        out.append(scoreComment(displayScore)).append("\n");
-
-        out.append("  ").append(t("report.level", t(level.nameKey))).append(" - ").append(t(level.descriptionKey)).append(" ").append(level.emoji).append("\n\n");
-
-        if (!options.summaryOnly) {
-            out.append(sectionTitle(t("report.section.metrics"))).append("\n");
-            out.append(renderMetrics(result.getMetrics())).append("\n\n");
-
-            if (options.verbose) {
-                out.append(sectionTitle(t("report.section.files_all"))).append("\n");
-                out.append(renderAllFiles(result.getFilesAnalyzed(), options.maxIssues)).append("\n\n");
-            } else {
-                out.append(sectionTitle(t("report.section.top_issues"))).append("\n");
-                out.append(renderTopIssues(result.getFilesAnalyzed(), options.topFiles, options.maxIssues)).append("\n\n");
-            }
-        }
-
-        out.append(sectionTitle(t("report.section.summary"))).append("\n");
-        out.append(renderSummary(result)).append("\n");
-
-        if (options.verbose) {
-            out.append(sectionTitle(t("report.section.details"))).append("\n");
-            out.append(renderVerboseInfo(result)).append("\n");
-        }
-
-        printDivider(out);
-        out.append("\n");
-        return maybeColorize(out.toString(), options.useColor);
+        return generateMarkdownReport(result, options);
     }
 
     // Markdown 报告
@@ -127,13 +85,8 @@ public class Report {
             md.append("## ").append(t("report.section.metrics")).append("\n\n");
             md.append(renderMetricsMarkdown(result.getMetrics())).append("\n\n");
 
-            if (options.verbose) {
-                md.append("## ").append(t("report.section.files_all")).append("\n\n");
-                md.append(renderAllFilesMarkdown(result.getFilesAnalyzed(), options.maxIssues)).append("\n\n");
-            } else {
-                md.append("## ").append(t("report.section.top_issues")).append("\n\n");
-                md.append(renderTopIssuesMarkdown(result.getFilesAnalyzed(), options.topFiles, options.maxIssues)).append("\n\n");
-            }
+            md.append("## All Issues\n\n");
+            md.append(renderAllIssuesMarkdown(result.getFilesAnalyzed())).append("\n\n");
         }
 
         md.append("## ").append(t("report.section.summary")).append("\n\n");
@@ -164,7 +117,8 @@ public class Report {
     private String renderMetricsMarkdown(Map<String, MetricResult> metrics) {
         if (metrics == null || metrics.isEmpty()) return "_" + t("report.metrics.none") + "_";
         StringBuilder sb = new StringBuilder();
-        sb.append("| Metric | Score | Weight | Description |\n|---|---:|---:|---|\n");
+        sb.append("|    Metric    |  Score  | Weight | Description |\n");
+        sb.append("|--------------|---------|--------|-------------|\n");
         List<Map.Entry<String, MetricResult>> ordered = metrics.entrySet().stream()
                 .sorted(Comparator.comparingDouble(e -> -clamp01(e.getValue().getScore())))
                 .collect(Collectors.toList());
@@ -205,6 +159,26 @@ public class Report {
             List<String> issues = takeIssues(f.getIssues(), maxIssues);
             for (String issue : issues) {
                 sb.append("  - ").append(escapeMd(issue)).append("\n");
+            }
+        }
+        return sb.toString();
+    }
+
+    private String renderAllIssuesMarkdown(List<FileAnalysisResult> files) {
+        if (files == null || files.isEmpty()) return "_" + t("report.files.none") + "_";
+        StringBuilder sb = new StringBuilder();
+        List<FileAnalysisResult> ordered = files.stream()
+                .sorted(Comparator.comparingDouble(f -> -clamp01(f.getFileScore())))
+                .collect(Collectors.toList());
+        for (FileAnalysisResult f : ordered) {
+            sb.append(String.format(Locale.ROOT, "- `%s` (%.2f%%)\n", f.getFilePath(), clamp01(f.getFileScore()) * 100.0));
+            List<Issue> issues = f.getIssues() != null ? f.getIssues() : List.of();
+            for (Issue is : issues) {
+                String file = is.getFile() != null ? is.getFile() : f.getFilePath();
+                String lineStr = is.getLine() != null ? String.valueOf(is.getLine()) : "-";
+                String sev = String.valueOf(is.getSeverity());
+                String msg = is.getMessage() != null ? is.getMessage() : "";
+                sb.append(String.format(Locale.ROOT, "  - [%s] %s:%s - %s\n", sev, escapeMd(file), lineStr, escapeMd(msg)));
             }
         }
         return sb.toString();
@@ -292,10 +266,6 @@ public class Report {
 
     private String sectionTitle(String text) {
         return "== " + text + " ==";
-    }
-
-    private void printDivider(StringBuilder out) {
-        out.append("----------------------------------------\n");
     }
 
     private double clamp01(double v) {
