@@ -32,7 +32,7 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
         JavaASTInfo astInfo = JavaASTExtractor.extractJavaAST(parseResult);
 
         if (astInfo == null) {
-            return new MetricResult(0.0, null, this.getDescription(), this.getWeight());
+            return new MetricResult(0.0, new ArrayList<>(), this.getDescription(), this.getWeight());
         }
         if (astInfo.getContent().length == 0) {
             astInfo.setContent("\n".repeat(parseResult.getTotalLines()).getBytes(StandardCharsets.UTF_8));
