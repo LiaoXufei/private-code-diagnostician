@@ -132,19 +132,19 @@ public class ErrorHandlingMetric extends BaseMetric implements Metric {
             }
         });
 
-        if (totalErrorRelatedMethods.get() == 0) {
-            return new ScoreAndIssues(0.0, issues);
-        }
+//        if (totalErrorRelatedMethods.get() == 0) {
+//            return new ScoreAndIssues(0.0, issues);
+//        }
 
         double score = calculateScore(ignoredErrors.get(), totalErrorRelatedMethods.get());
         return new ScoreAndIssues(score, issues);
     }
 
     private double calculateScore(int ignoredErrors, int totalErrorReturns) {
-        if (totalErrorReturns == 0) return 0.6;
+        if (totalErrorReturns == 0) return 1.0;
 
         double ignoredRatio = (double) ignoredErrors / (double) totalErrorReturns;
-        double score = ignoredRatio * 10.0;
+        double score = ignoredRatio;
 
         return 1.0 - Math.min(score, 1.0);
     }

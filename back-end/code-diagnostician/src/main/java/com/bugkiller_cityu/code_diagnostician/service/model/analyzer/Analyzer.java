@@ -1,6 +1,7 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.analyzer;
 
 import com.bugkiller_cityu.code_diagnostician.entity.Issue;
+import com.bugkiller_cityu.code_diagnostician.service.MetricService;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -244,9 +245,10 @@ public abstract class Analyzer {
     public static Analyzer newAnalyzer() {
         // 这个方法保留仅为向后兼容，不应在新代码中使用
         Factory factory = new Factory();
+        MetricService metricService = null;
         Translator translator = new DefaultTranslator(Language.EN_US);
         return new DefaultAnalyzer(
-                new CodeAnalyzer(translator, factory),
+                new CodeAnalyzer(translator, factory, metricService),
                 translator
         );
     }
@@ -557,11 +559,15 @@ public abstract class Analyzer {
     @Component
     public static class CodeAnalyzer {
         private final Factory metricFactory;
+        @Autowired
+        private final MetricService metricService;
         private Translator translator;
 
-        public CodeAnalyzer(Translator translator, Factory metricFactory) {
+
+        public CodeAnalyzer(Translator translator, Factory metricFactory, MetricService metricService) {
             this.translator = translator;
             this.metricFactory = metricFactory;
+            this.metricService = metricService;
         }
 
         public void setTranslator(Translator translator) {
@@ -617,6 +623,8 @@ public abstract class Analyzer {
                         }
                     }
                 }
+
+//                com.bugkiller_cityu.code_diagnostician.service.model.metric.AnalysisResult result1 = metricService.analyzeAllMetrics(parseResult);
                 result.setImports(imports);
                 result.setMetricResults(new HashMap<>());
                 result.setFunctions(parseResult.getFunctions());
@@ -626,7 +634,6 @@ public abstract class Analyzer {
                     com.bugkiller_cityu.code_diagnostician.service.model.metric.MetricResult mr = metric.analyze(parseResult);
                     result.addMetricResult(metric.getName(), mr);
                 }
-
                 return result;
             } catch (IOException e) {
                 throw new AnalysisException("Failed to analyze file: " + filePath, e);

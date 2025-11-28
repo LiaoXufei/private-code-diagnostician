@@ -70,15 +70,15 @@ public class CodeDuplicationMetric extends BaseMetric implements Metric{
         // 查找重复函数
         int duplicatedCount = findDuplicatedFunctions(similarFunctions, issues, filePath, cu);
 
-        // 如果函数数量太少，返回低分
-        if (totalFunctions < 3) {
-            return new MetricResult(
-                    0.1,
-                    issues,
-                    this.getDescription(),
-                    this.getWeight()
-            );
-        }
+//        // 如果函数数量太少，返回低分
+//        if (totalFunctions < 3) {
+//            return new MetricResult(
+//                    0.1,
+//                    issues,
+//                    this.getDescription(),
+//                    this.getWeight()
+//            );
+//        }
 
         // 计算重复率和得分
         double duplicationRate = (double) duplicatedCount / totalFunctions;
