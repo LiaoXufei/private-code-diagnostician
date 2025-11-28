@@ -203,14 +203,14 @@
                   <BulbOutlined />
                   查看优化建议
                 </a-button>
-                <a-button block @click="exportReport('pdf')">
+<!--                <a-button block @click="exportReport('pdf')">-->
+<!--                  <FileTextOutlined />-->
+<!--                  导出PDF报告-->
+<!--                </a-button>-->
+                <a-button block @click="exportReport('md')">
                   <FileTextOutlined />
-                  导出PDF报告
+                  导出Markdown报告
                 </a-button>
-    <a-button block @click="exportReport('md')">
-      <FileTextOutlined />
-      导出Markdown文件
-    </a-button>
                 <a-button block @click="reanalyze">
                   <RedoOutlined />
                   重新分析
