@@ -179,7 +179,7 @@ public class Report {
                 String sev = String.valueOf(is.getSeverity());
                 String msg = is.getMessage() != null ? is.getMessage() : "";
                 String suggestion = is.getSuggestion() != null ? is.getSuggestion() : "";
-                sb.append(String.format(Locale.ROOT, "  - [%s] %s:%s - %s\nsuggestion: %s\n", sev, escapeMd(file), lineStr, escapeMd(msg), escapeMd(suggestion)));
+                sb.append(String.format(Locale.ROOT, "  - [%s] %s:%s - %s\n建议：%s\n", sev, escapeMd(file), lineStr, escapeMd(msg), escapeMd(suggestion)));
             }
         }
         return sb.toString();
