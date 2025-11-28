@@ -107,6 +107,9 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
             @Override
             public boolean visit(MethodDeclaration node) {
                 totalNames++;
+                if (node.isConstructor()) {
+                    return super.visit(node);
+                }
                 String name = node.getName().getIdentifier();
                 if (!NamingRules.isValidFuncName(name)) {
                     Issue issue = new Issue();

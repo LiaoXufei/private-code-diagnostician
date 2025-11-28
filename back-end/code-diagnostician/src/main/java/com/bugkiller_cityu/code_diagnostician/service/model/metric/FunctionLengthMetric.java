@@ -188,111 +188,112 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
 
     private ScoreAndIssues analyzeStateManagement(CompilationUnit cu) {
         List<Issue> issues = new ArrayList<>();
-        int globalVars = 0;
-        AtomicInteger mutableVars = new AtomicInteger(0);
-        AtomicInteger totalVars = new AtomicInteger(0);
-        Map<String, StateVarInfo> stateVars = new HashMap<>();
-        String filePath = (String) cu.getProperty("filePath");
-
-        // 检测全局变量
-        for (Object typeObj : cu.types()) {
-            if (typeObj instanceof TypeDeclaration typeDecl) {
-                for (FieldDeclaration fieldDecl : typeDecl.getFields()) {
-                    int lineNum = cu.getLineNumber(fieldDecl.getStartPosition());
-                    for (Object fragObj : fieldDecl.fragments()) {
-                        if (fragObj instanceof VariableDeclarationFragment frag) {
-                            String varName = frag.getName().getIdentifier();
-                            if (!varName.equals("_")) { // 忽略占位符变量
-                                stateVars.put(varName, new StateVarInfo(true, true));
-                                globalVars++;
-                                mutableVars.incrementAndGet();
-                                totalVars.incrementAndGet();
-
-                                Issue issue = createIssue(
-                                        "state_management",
-                                        SeverityEnum.MEDIUM.getMessage(),
-                                        filePath,
-                                        lineNum,
-                                        String.format("全局变量 '%s' 可能导致状态难以追踪", varName),
-                                        "尽量避免使用全局变量，可通过参数传递或封装为对象属性"
-                                );
-                                issues.add(issue);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // 检测函数内部状态问题
-        cu.accept(new ASTVisitor() {
-            @Override
-            public boolean visit(MethodDeclaration node) {
-                String funcName = node.getName().getIdentifier();
-                int funcLine = cu.getLineNumber(node.getStartPosition());
-
-                // 检测指针/引用类型参数（可能导致外部状态修改）
-                if (node.parameters() != null) {
-                    for (Object pObj : node.parameters()) {
-                        if (pObj instanceof SingleVariableDeclaration param) {
-                            Type paramType = param.getType();
-                            if (paramType.isArrayType() || paramType.isSimpleType() || paramType.isQualifiedType()) {
-                                String paramName = param.getName().getIdentifier();
-                                Issue issue = createIssue(
-                                        "state_management",
-                                        SeverityEnum.LOW.getMessage(),
-                                        filePath,
-                                        cu.getLineNumber(param.getStartPosition()),
-                                        String.format("函数 '%s' 的引用类型参数 '%s' 可能导致状态被外部修改", funcName, paramName),
-                                        "避免使用可变引用类型作为参数，或使用不可变对象"
-                                );
-                                issues.add(issue);
-                                mutableVars.incrementAndGet();
-                                totalVars.incrementAndGet();
-                            }
-                        }
-                    }
-                }
-
-                // 检测函数体中对状态变量的非法修改
-                if (node.getBody() != null) {
-                    node.getBody().accept(new ASTVisitor() {
-                        @Override
-                        public boolean visit(Assignment assign) {
-                            Expression left = assign.getLeftHandSide();
-                            if (left instanceof SimpleName ident) {
-                                String varName = ident.getIdentifier();
-                                StateVarInfo info = stateVars.get(varName);
-                                if (info != null && !info.isMutable) {
-                                    Issue issue = createIssue(
-                                            "state_management",
-                                            SeverityEnum.HIGH.getMessage(),
-                                            filePath,
-                                            cu.getLineNumber(assign.getStartPosition()),
-                                            String.format("在函数 '%s' 中修改了不应变化的状态变量 '%s'", funcName, varName),
-                                            "检查变量可变性设计，避免修改只读状态变量"
-                                    );
-                                    issues.add(issue);
-                                }
-                            }
-                            return super.visit(assign);
-                        }
-                    });
-                }
-                return super.visit(node);
-            }
-        });
-
-        // 计算状态管理评分
-        double score = 0.0;
-        if (totalVars.get() > 0) {
-            double globalRatio = (double) globalVars / totalVars.get();
-            double mutableRatio = (double) mutableVars.get() / totalVars.get();
-            score = globalRatio * 0.6 + mutableRatio * 0.4;
-            score = 1.0 - Math.min(score, 1.0);
-        }
-
-        return new ScoreAndIssues(score, issues);
+        return new ScoreAndIssues(1.0,issues);
+//        int globalVars = 0;
+//        AtomicInteger mutableVars = new AtomicInteger(0);
+//        AtomicInteger totalVars = new AtomicInteger(0);
+//        Map<String, StateVarInfo> stateVars = new HashMap<>();
+//        String filePath = (String) cu.getProperty("filePath");
+//
+//        // 检测全局变量
+//        for (Object typeObj : cu.types()) {
+//            if (typeObj instanceof TypeDeclaration typeDecl) {
+//                for (FieldDeclaration fieldDecl : typeDecl.getFields()) {
+//                    int lineNum = cu.getLineNumber(fieldDecl.getStartPosition());
+//                    for (Object fragObj : fieldDecl.fragments()) {
+//                        if (fragObj instanceof VariableDeclarationFragment frag) {
+//                            String varName = frag.getName().getIdentifier();
+//                            if (!varName.equals("_")) { // 忽略占位符变量
+//                                stateVars.put(varName, new StateVarInfo(true, true));
+//                                globalVars++;
+//                                mutableVars.incrementAndGet();
+//                                totalVars.incrementAndGet();
+//
+//                                Issue issue = createIssue(
+//                                        "state_management",
+//                                        SeverityEnum.MEDIUM.getMessage(),
+//                                        filePath,
+//                                        lineNum,
+//                                        String.format("全局变量 '%s' 可能导致状态难以追踪", varName),
+//                                        "尽量避免使用全局变量，可通过参数传递或封装为对象属性"
+//                                );
+//                                issues.add(issue);
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//
+//        // 检测函数内部状态问题
+//        cu.accept(new ASTVisitor() {
+//            @Override
+//            public boolean visit(MethodDeclaration node) {
+//                String funcName = node.getName().getIdentifier();
+//                int funcLine = cu.getLineNumber(node.getStartPosition());
+//
+//                // 检测指针/引用类型参数（可能导致外部状态修改）
+//                if (node.parameters() != null) {
+//                    for (Object pObj : node.parameters()) {
+//                        if (pObj instanceof SingleVariableDeclaration param) {
+//                            Type paramType = param.getType();
+//                            if (paramType.isArrayType() || paramType.isSimpleType() || paramType.isQualifiedType()) {
+//                                String paramName = param.getName().getIdentifier();
+//                                Issue issue = createIssue(
+//                                        "state_management",
+//                                        SeverityEnum.LOW.getMessage(),
+//                                        filePath,
+//                                        cu.getLineNumber(param.getStartPosition()),
+//                                        String.format("函数 '%s' 的引用类型参数 '%s' 可能导致状态被外部修改", funcName, paramName),
+//                                        "避免使用可变引用类型作为参数，或使用不可变对象"
+//                                );
+//                                issues.add(issue);
+//                                mutableVars.incrementAndGet();
+//                                totalVars.incrementAndGet();
+//                            }
+//                        }
+//                    }
+//                }
+//
+//                // 检测函数体中对状态变量的非法修改
+//                if (node.getBody() != null) {
+//                    node.getBody().accept(new ASTVisitor() {
+//                        @Override
+//                        public boolean visit(Assignment assign) {
+//                            Expression left = assign.getLeftHandSide();
+//                            if (left instanceof SimpleName ident) {
+//                                String varName = ident.getIdentifier();
+//                                StateVarInfo info = stateVars.get(varName);
+//                                if (info != null && !info.isMutable) {
+//                                    Issue issue = createIssue(
+//                                            "state_management",
+//                                            SeverityEnum.HIGH.getMessage(),
+//                                            filePath,
+//                                            cu.getLineNumber(assign.getStartPosition()),
+//                                            String.format("在函数 '%s' 中修改了不应变化的状态变量 '%s'", funcName, varName),
+//                                            "检查变量可变性设计，避免修改只读状态变量"
+//                                    );
+//                                    issues.add(issue);
+//                                }
+//                            }
+//                            return super.visit(assign);
+//                        }
+//                    });
+//                }
+//                return super.visit(node);
+//            }
+//        });
+//
+//        // 计算状态管理评分
+//        double score = 0.0;
+//        if (totalVars.get() > 0) {
+//            double globalRatio = (double) globalVars / totalVars.get();
+//            double mutableRatio = (double) mutableVars.get() / totalVars.get();
+//            score = globalRatio * 0.6 + mutableRatio * 0.4;
+//            score = 1.0 - Math.min(score, 1.0);
+//        }
+//
+//        return new ScoreAndIssues(score, issues);
     }
 
     // 辅助方法：创建Issue对象
