@@ -464,9 +464,9 @@ public class ProjectController {
                 }
             }
 
-            double overall = fileResults.isEmpty() ? 0.0 : codeAnalyzer.calculateOverallScore(fileResults);
-            int overallInt = (int) Math.round(overall * 100.0);
-            String grade = overallInt >= 85 ? "excellent" : overallInt >= 70 ? "good" : "poor";
+        double riskScore = fileResults.isEmpty() ? 0.0 : codeAnalyzer.calculateOverallScore(fileResults);
+        int overallInt = (int) Math.round((1.0 - riskScore) * 100.0);
+        String grade = overallInt >= 85 ? "excellent" : overallInt >= 70 ? "good" : "poor";
 
             Map<String, List<com.bugkiller_cityu.code_diagnostician.service.model.metric.MetricResult>> metricsMap = new LinkedHashMap<>();
             for (var fr : fileResults) {
@@ -477,13 +477,14 @@ public class ProjectController {
             }
 
             List<Dimension> dimensions = new ArrayList<>();
-            for (var entry : metricsMap.entrySet()) {
-                String name = entry.getKey();
-                List<com.bugkiller_cityu.code_diagnostician.service.model.metric.MetricResult> mrs = entry.getValue();
-                double avg = mrs.stream().mapToDouble(com.bugkiller_cityu.code_diagnostician.service.model.metric.MetricResult::getScore).average().orElse(0.0);
-                int issuesCount = mrs.stream().mapToInt(m -> m.getIssues() == null ? 0 : m.getIssues().size()).sum();
-                dimensions.add(createDimension(savedAnalysis.getId(), name, (int) Math.round(avg * 100.0), 100, issuesCount));
-            }
+        for (var entry : metricsMap.entrySet()) {
+            String name = entry.getKey();
+            List<com.bugkiller_cityu.code_diagnostician.service.model.metric.MetricResult> mrs = entry.getValue();
+            double avgRisk = mrs.stream().mapToDouble(com.bugkiller_cityu.code_diagnostician.service.model.metric.MetricResult::getScore).average().orElse(0.0);
+            int issuesCount = mrs.stream().mapToInt(m -> m.getIssues() == null ? 0 : m.getIssues().size()).sum();
+            int dimScore = (int) Math.round((1.0 - avgRisk) * 100.0);
+            dimensions.add(createDimension(savedAnalysis.getId(), name, dimScore, 100, issuesCount));
+        }
             if (!dimensions.isEmpty()) dimensionRepository.saveAll(dimensions);
 
             List<Issue> allIssues = new ArrayList<>();
@@ -561,9 +562,9 @@ public class ProjectController {
             Map<String, Object> metrics = new LinkedHashMap<>();
             metrics.put("fileCount", project.getFileCount());
             metrics.put("totalIssues", issues.size());
-            metrics.put("criticalIssues", issues.stream().filter(i -> "critical".equals(i.getSeverity())).count());
-            metrics.put("majorIssues", issues.stream().filter(i -> "major".equals(i.getSeverity())).count());
-            metrics.put("minorIssues", issues.stream().filter(i -> "minor".equals(i.getSeverity())).count());
+            metrics.put("criticalIssues", issues.stream().filter(i -> "high".equalsIgnoreCase(i.getSeverity())).count());
+            metrics.put("majorIssues", issues.stream().filter(i -> "medium".equalsIgnoreCase(i.getSeverity())).count());
+            metrics.put("minorIssues", issues.stream().filter(i -> "low".equalsIgnoreCase(i.getSeverity())).count());
 
             // 优化建议
             Map<String, Object> summary = new LinkedHashMap<>();
