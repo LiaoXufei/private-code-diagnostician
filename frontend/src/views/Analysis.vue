@@ -503,58 +503,7 @@
             </div>
           </a-tab-pane>
 
-          <!-- 分析日志标签页 -->
-          <a-tab-pane key="logs" tab="分析日志">
-            <template #tab>
-              <span class="tab-title">
-                <FileTextOutlined />
-                分析日志
-                <a-badge
-                  :count="logs.length"
-                  :number-style="{ backgroundColor: '#1890ff' }"
-                  v-if="logs.length > 0"
-                />
-              </span>
-            </template>
-
-            <div class="tab-content logs-tab">
-              <div class="logs-toolbar">
-                <a-space>
-                  <a-button size="small" @click="clearLogs">
-                    <ClearOutlined />
-                    清空日志
-                  </a-button>
-                  <a-button size="small" @click="exportLogs">
-                    <DownloadOutlined />
-                    导出日志
-                  </a-button>
-                  <a-switch
-                    v-model:checked="autoScroll"
-                    size="small"
-                    checked-children="自动滚动"
-                    un-checked-children="手动"
-                  />
-                </a-space>
-              </div>
-
-              <div class="logs-container" ref="logsContainer">
-                <div v-if="logs.length === 0" class="empty-logs">
-                  <a-empty description="暂无日志记录" :image="false" />
-                </div>
-                <div v-else class="log-list">
-                  <div
-                    v-for="(log, index) in logs"
-                    :key="index"
-                    :class="['log-item', log.level]"
-                  >
-                    <span class="log-time">{{ formatLogTime(log.timestamp) }}</span>
-                    <span class="log-level">[{{ log.level.toUpperCase() }}]</span>
-                    <span class="log-message">{{ log.message }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </a-tab-pane>
+          
         </a-tabs>
       </a-card>
     </div>
@@ -575,7 +524,6 @@ import {
   HistoryOutlined,
   SettingOutlined,
   BulbOutlined,
-  FileTextOutlined,
   UploadOutlined,
   CheckSquareOutlined,
   BorderOutlined,
@@ -586,9 +534,7 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   RedoOutlined,
-  BarChartOutlined,
-  ClearOutlined,
-  DownloadOutlined
+  BarChartOutlined
 } from '@ant-design/icons-vue'
 
 const router = useRouter()
@@ -609,8 +555,6 @@ const selectedAnalysisFiles = ref([])
 const selectedFileKeys = ref([])
 
 const analysisHistory = ref([])
-const logs = ref([])
-const autoScroll = ref(true)
 
 // 配置来源信息
 const configSourceInfo = computed(() => {
@@ -873,26 +817,7 @@ const resetConfig = () => {
   resetToProjectDefaults()
 }
 
-// 日志相关方法
-const clearLogs = () => {
-  logs.value = []
-}
-
-const exportLogs = () => {
-  const logText = logs.value.map(log =>
-    `${formatLogTime(log.timestamp)} [${log.level.toUpperCase()}] ${log.message}`
-  ).join('\n')
-
-  const blob = new Blob([logText], { type: 'text/plain' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `analysis-logs-${new Date().toISOString().split('T')[0]}.txt`
-  a.click()
-  URL.revokeObjectURL(url)
-
-  message.success('日志已导出')
-}
+ 
 
 // 工具方法
 const formatFileSize = (bytes) => {
@@ -979,9 +904,7 @@ const formatTime = (time) => {
   return `${year}-${month}-${day} ${hours}:${minutes}`
 }
 
-const formatLogTime = (timestamp) => {
-  return new Date(timestamp).toLocaleTimeString()
-}
+ 
 
 const formatElapsedTime = () => {
   if (!analysisStartTime.value) return '0分钟'
@@ -1552,78 +1475,7 @@ onUnmounted(() => {
   line-height: 1.5;
 }
 
-/* 日志页面样式 */
-.logs-toolbar {
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  background: #fafafa;
-  border-radius: 6px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.logs-container {
-  height: 400px;
-  overflow-y: auto;
-  border: 1px solid #f0f0f0;
-  border-radius: 6px;
-  background: #fff;
-  padding: 16px;
-}
-
-.log-list {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.log-item {
-  margin-bottom: 8px;
-  padding: 8px 12px;
-  border-radius: 4px;
-  word-break: break-all;
-}
-
-.log-item.info {
-  background: #f6ffed;
-  border-left: 3px solid #52c41a;
-}
-
-.log-item.warn {
-  background: #fffbe6;
-  border-left: 3px solid #faad14;
-}
-
-.log-item.error {
-  background: #fff2f0;
-  border-left: 3px solid #ff4d4f;
-}
-
-.log-time {
-  color: #8c8c8c;
-  margin-right: 12px;
-  min-width: 80px;
-}
-
-.log-level {
-  color: #1890ff;
-  font-weight: bold;
-  margin-right: 12px;
-  min-width: 60px;
-}
-
-.log-message {
-  flex: 1;
-  color: #262626;
-}
-
-.empty-logs {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-}
+ 
 
 /* 响应式设计 */
 @media (max-width: 1200px) {

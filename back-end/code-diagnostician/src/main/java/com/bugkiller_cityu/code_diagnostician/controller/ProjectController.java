@@ -469,7 +469,7 @@ public class ProjectController {
 
             double riskScore = fileResults.isEmpty() ? 0.0 : codeAnalyzer.calculateOverallScore(fileResults);
             int overallInt = (int) Math.round(riskScore * 100.0);
-            String grade = overallInt >= 85 ? "excellent" : overallInt >= 70 ? "good" : "poor";
+            String grade = overallInt >= 80 ? "excellent" : overallInt >= 60 ? "good" : "poor";
 
             Map<String, List<com.bugkiller_cityu.code_diagnostician.service.model.metric.MetricResult>> metricsMap = new LinkedHashMap<>();
             for (var fr : fileResults) {

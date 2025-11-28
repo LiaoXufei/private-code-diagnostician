@@ -247,13 +247,31 @@ const projectStore = useProjectStore()
 
 // 响应式数据
 const loading = ref(false)
-const selectedDimension = ref('')
-const selectedSeverity = ref('')
+const selectedDimension = ref(undefined)
+const selectedSeverity = ref(undefined)
 const searchKeyword = ref('')
 const currentPage = ref(1)
 const pageSize = ref(10)
 const radarChartRef = ref(null)
 const radarChart = ref(null)
+
+const dimensionTypeMap = {
+  // 后端维度名称
+  '圈复杂度分析': ['cyclomatic_complexity'],
+  '命名规范': ['naming_convention'],
+  '错误处理分析': ['error_handling'],
+  '代码重复度': ['code_duplication'],
+  '状态管理': ['state_management', 'parameter_count', 'function_length'],
+  '结构分析': ['nesting_depth', 'circular_dependency', 'import_complexity'],
+  '注释覆盖率': ['comment_coverage'],
+  // 前端演示维度名称（兼容）
+  //'代码复杂度': ['complexity', 'cyclomatic_complexity', 'nesting_depth'],
+  '可维护性': ['naming_convention', 'state_management', 'parameter_count', 'function_length', 'comment_coverage'],
+//  '重复度': ['code_duplication'],
+//  '代码风格': ['naming_convention'],
+//  '测试覆盖': ['comment_coverage'],
+//  '安全性': ['error_handling']
+}
 
 // 获取当前项目数据
 const currentProject = computed(() => {
@@ -310,7 +328,7 @@ const reportData = computed(() => {
       },
       {
         id: 'issue_2',
-        type: 'maintainability',
+        type: 'naming_convention',
         severity: 'medium',
         file: '/src/utils/helper.js',
         line: 23,
@@ -345,7 +363,11 @@ const filteredIssues = computed(() => {
   let issues = reportData.value.issues
 
   if (selectedDimension.value) {
-    issues = issues.filter(issue => issue.type === selectedDimension.value)
+    const key = String(selectedDimension.value).trim()
+    const typeKeys = dimensionTypeMap[key]
+    if (Array.isArray(typeKeys) && typeKeys.length > 0) {
+      issues = issues.filter(issue => typeKeys.includes(issue.type))
+    }
   }
 
   if (selectedSeverity.value) {

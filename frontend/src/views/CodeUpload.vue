@@ -6,7 +6,7 @@
         代码上传
       </h1>
       <p class="page-description">
-        上传您的代码文件或导入Git仓库开始分析
+        上传您的代码文件开始分析
       </p>
     </div>
 
@@ -125,85 +125,7 @@
                 </div>
               </a-tab-pane>
 
-              <!-- Git仓库导入 -->
-              <a-tab-pane key="git" tab="Git仓库">
-                <div class="git-section">
-                  <a-form
-                    ref="gitFormRef"
-                    :model="gitForm"
-                    :rules="gitRules"
-                    layout="vertical"
-                  >
-                    <a-form-item label="仓库地址" name="url" required>
-                      <a-input
-                        v-model:value="gitForm.url"
-                        placeholder="https://github.com/username/repository.git"
-                        size="large"
-                      />
-                      <div class="form-help-text">
-                        支持 GitHub、GitLab、Gitee 等主流Git服务
-                      </div>
-                    </a-form-item>
-
-                    <a-row :gutter="16">
-                      <a-col :span="12">
-                        <a-form-item label="分支" name="branch">
-                          <a-input
-                            v-model:value="gitForm.branch"
-                            placeholder="main"
-                            size="large"
-                          />
-                        </a-form-item>
-                      </a-col>
-                      <a-col :span="12">
-                        <a-form-item label="目录" name="path">
-                          <a-input
-                            v-model:value="gitForm.path"
-                            placeholder="src (可选)"
-                            size="large"
-                          />
-                        </a-form-item>
-                      </a-col>
-                    </a-row>
-
-                    <a-form-item label="认证方式" name="authType">
-                      <a-radio-group v-model:value="gitForm.authType">
-                        <a-radio value="public">公开仓库</a-radio>
-                        <a-radio value="token">Token认证</a-radio>
-                        <a-radio value="password">用户名密码</a-radio>
-                      </a-radio-group>
-                    </a-form-item>
-
-                    <a-form-item
-                      v-if="gitForm.authType !== 'public'"
-                      label="访问令牌"
-                      name="token"
-                    >
-                      <a-input-password
-                        v-model:value="gitForm.token"
-                        placeholder="请输入访问令牌"
-                        size="large"
-                      />
-                      <div class="form-help-text">
-                        令牌将被加密存储，仅用于本次导入
-                      </div>
-                    </a-form-item>
-
-                    <a-form-item>
-                      <a-button
-                        type="primary"
-                        size="large"
-                        block
-                        :loading="importing"
-                        @click="importGitRepo"
-                      >
-                        <BranchesOutlined />
-                        导入Git仓库
-                      </a-button>
-                    </a-form-item>
-                  </a-form>
-                </div>
-              </a-tab-pane>
+              
             </a-tabs>
           </a-card>
 
@@ -357,7 +279,6 @@ import {
   FileOutlined,
   DeleteOutlined,
   DownloadOutlined,
-  BranchesOutlined,
   ExperimentOutlined,
   ClearOutlined,
   RightOutlined,
@@ -380,8 +301,7 @@ const fileTree = ref([])
 const selectedFile = ref(null)
 const fileContent = ref('')
 const expandedKeys = ref([])
-const importing = ref(false)
-const gitFormRef = ref()
+// 移除Git导入相关引用
 
 // 项目文件数据
 const projectFiles = ref([])
@@ -391,23 +311,7 @@ const projectFileStats = ref({
 })
 const loadingProjectFiles = ref(false)
 
-const gitForm = reactive({
-  url: '',
-  branch: 'main',
-  path: '',
-  authType: 'public',
-  token: ''
-})
-
-const gitRules = {
-  url: [
-    { required: true, message: '请输入仓库地址', trigger: 'blur' },
-    { type: 'url', message: '请输入有效的仓库地址', trigger: 'blur' }
-  ],
-  branch: [
-    { required: true, message: '请输入分支名', trigger: 'blur' }
-  ]
-}
+// 移除Git导入相关表单
 
 // 获取项目文件数据
 const loadProjectFiles = async () => {
@@ -583,28 +487,7 @@ const uploadFiles = async () => {
   }
 }
 
-const importGitRepo = async () => {
-  try {
-    await gitFormRef.value.validate()
-
-    importing.value = true
-    const projectId = route.params.id
-
-    await uploadStore.uploadGitRepo(projectId, gitForm)
-
-    // 重新从数据库加载项目文件数据
-    await loadProjectFiles()
-
-    message.success('Git仓库导入成功')
-
-    // 刷新文件树
-    await fetchFileTree(projectId)
-  } catch (error) {
-    console.error('导入失败:', error)
-  } finally {
-    importing.value = false
-  }
-}
+// 移除Git导入方法
 
 const removeFile = async (file) => {
   const projectId = route.params.id
