@@ -207,10 +207,10 @@
                   <FileTextOutlined />
                   导出PDF报告
                 </a-button>
-                <a-button block @click="exportReport('excel')">
-                  <TableOutlined />
-                  导出Excel报告
-                </a-button>
+    <a-button block @click="exportReport('md')">
+      <FileTextOutlined />
+      导出Markdown文件
+    </a-button>
                 <a-button block @click="reanalyze">
                   <RedoOutlined />
                   重新分析
@@ -229,6 +229,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { useProjectStore } from '@/stores/project'
+import { projectApi } from '@/api/project'
 import * as echarts from 'echarts'
 import {
   BarChartOutlined,
@@ -261,8 +262,14 @@ const currentProject = computed(() => {
   return projectStore.projectById(projectId)
 })
 
+// 后端报告数据
+const backendReport = ref(null)
+
 // 报告数据
 const reportData = computed(() => {
+  if (backendReport.value) {
+    return backendReport.value
+  }
   const project = currentProject.value
   console.log('Report.vue - 当前项目:', project)
 
@@ -442,13 +449,38 @@ const goToOptimize = () => {
 }
 
 const exportReport = (format) => {
-  console.log(`🟢 Report.exportReport 被调用，格式: ${format}`)
-  message.success(`正在导出${format.toUpperCase()}报告...`)
-
-  // 模拟导出操作
-  setTimeout(() => {
-    message.success(`${format.toUpperCase()}报告导出成功！`)
-  }, 2000)
+  const projectId = route.params.id
+  if (!projectId) {
+    message.error('项目ID不能为空')
+    return
+  }
+  if (format === 'pdf') {
+    const url = `/api/projects/${projectId}/report.pdf`
+    const a = document.createElement('a')
+    a.href = url
+    a.target = '_blank'
+    a.rel = 'noopener'
+    a.download = `report-${projectId}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    message.success('开始下载PDF报告')
+    return
+  }
+  if (format === 'md') {
+    const url = `/api/projects/${projectId}/report.md`
+    const a = document.createElement('a')
+    a.href = url
+    a.target = '_blank'
+    a.rel = 'noopener'
+    a.download = `report-${projectId}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    message.success('开始下载Markdown报告')
+    return
+  }
+  message.info('暂未支持的导出格式')
 }
 
 const reanalyze = () => {
@@ -609,8 +641,26 @@ const loadReportData = async () => {
 
     console.log('Report.vue - 加载报告数据，项目ID:', projectId)
 
-    // 模拟加载延迟
-    await new Promise(resolve => setTimeout(resolve, 500))
+    // 从后端获取最新分析结果
+    const { data } = await projectApi.getAnalysisResult(projectId)
+    backendReport.value = {
+      overallScore: data.overallScore || 0,
+      grade: data.grade || 'none',
+      dimensions: (data.dimensions || []).map(d => ({
+        name: d.name,
+        score: d.score,
+        maxScore: d.max_score || d.maxScore || 100,
+        issues: d.issues
+      })),
+      issues: data.issues || [],
+      fileResults: (data.fileResults || []).map(f => ({
+        file: f.file,
+        score: f.score,
+        issues: f.issues,
+        linesOfCode: f.linesOfCode || 0,
+        complexity: f.complexity || 0
+      }))
+    }
 
     // 等待DOM更新后初始化雷达图
     await nextTick()

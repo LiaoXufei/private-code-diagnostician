@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import lombok.Getter;
 import com.bugkiller_cityu.code_diagnostician.service.model.metric.Factory;
+import org.eclipse.jdt.core.dom.*;
 
 /**
  * Analyzer - 代码分析器抽象基类
@@ -136,8 +137,6 @@ public abstract class Analyzer {
      * @Autowired
      * private Analyzer analyzer;  // Spring会自动注入DefaultAnalyzer实例
      */
-    @Component
-    @Primary
     public static class DefaultAnalyzer extends Analyzer implements AnalyzerInterface {
 
         /**
@@ -555,7 +554,6 @@ public abstract class Analyzer {
 
     // 内层：CodeAnalyzer - 核心分析层
     // CodeAnalyzer 代码分析器
-    @Component
     public static class CodeAnalyzer {
         private final Factory metricFactory;
         private Translator translator;
@@ -590,12 +588,32 @@ public abstract class Analyzer {
                                 content
                         );
 
+                // 使用 Eclipse JDT 解析为 CompilationUnit，并设置到 ParseResult
+                ASTParser parser = ASTParser.newParser(AST.JLS21);
+                parser.setKind(ASTParser.K_COMPILATION_UNIT);
+                parser.setSource(new String(content).toCharArray());
+                parser.setResolveBindings(false);
+                CompilationUnit cu = (CompilationUnit) parser.createAST(null);
+                if (cu != null) {
+                    cu.setProperty("filePath", filePath);
+                    parseResult.setASTRoot(cu);
+                }
+
                 com.bugkiller_cityu.code_diagnostician.service.model.metric.AnalysisResult result =
                         new com.bugkiller_cityu.code_diagnostician.service.model.metric.AnalysisResult();
                 result.setFilePath(filePath);
                 result.setTotalLines(totalLines);
                 result.setCommentLines(commentLines);
-                result.setImports(new ArrayList<>());
+                // 从 AST 提取 import 列表
+                List<String> imports = new ArrayList<>();
+                if (cu != null) {
+                    for (Object obj : cu.imports()) {
+                        if (obj instanceof ImportDeclaration id) {
+                            imports.add(id.getName().getFullyQualifiedName());
+                        }
+                    }
+                }
+                result.setImports(imports);
                 result.setMetricResults(new HashMap<>());
                 result.setFunctions(new ArrayList<>());
                 result.setParseResult(parseResult);

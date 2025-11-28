@@ -7,7 +7,6 @@ import com.bugkiller_cityu.code_diagnostician.service.model.common.LanguageType;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParserFactory;
 import com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult;
 
-@Service
 public interface CodeService {
 }
 

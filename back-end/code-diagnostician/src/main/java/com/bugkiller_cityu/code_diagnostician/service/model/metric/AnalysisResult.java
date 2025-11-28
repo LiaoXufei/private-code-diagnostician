@@ -59,7 +59,10 @@ public class AnalysisResult {
     public List<Issue> getIssues() {
         List<Issue> issues = new LinkedList<>();
         for(MetricResult metricResult: metricResults.values()){
-            issues.addAll(metricResult.issues);
+            if (metricResult == null || metricResult.getIssues() == null) {
+                continue;
+            }
+            issues.addAll(metricResult.getIssues());
         }
         return issues;
     }
