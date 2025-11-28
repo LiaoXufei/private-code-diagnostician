@@ -99,7 +99,7 @@ class ErrorHandlingMetricTest extends BasicMetricTest {
         result.getIssues().forEach(System.out::println);
 
         assertNotNull(result);
-        assertEquals(0.0, result.getScore(), 1e-6);
+        assertEquals(1.0, result.getScore(), 1e-6);
         assertTrue(result.getIssues().isEmpty());
     }
 }

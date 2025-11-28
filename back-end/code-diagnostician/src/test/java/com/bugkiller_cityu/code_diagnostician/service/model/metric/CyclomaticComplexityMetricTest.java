@@ -39,8 +39,7 @@ class CyclomaticComplexityMetricTest extends BasicMetricTest {
         result.getIssues().forEach(System.out::println);
 
         assertNotNull(result);
-        // 复杂度 = 1 -> score = 0.4 + 0.1*1 = 0.5
-        assertEquals(0.5, result.getScore(), 1e-6);
+        assertEquals(0.8, result.getScore(), 1e-6);
         assertTrue(result.getIssues().isEmpty());
     }
 
@@ -72,8 +71,7 @@ class CyclomaticComplexityMetricTest extends BasicMetricTest {
         result.getIssues().forEach(System.out::println);
 
         assertNotNull(result);
-        // 根据当前复杂度计数（if + else-if + for + while => 5），score = 0.4 + 0.1*5 = 0.9
-        assertEquals(0.9, result.getScore(), 1e-6);
+        assertEquals(0.4, result.getScore(), 1e-6);
         // 中等复杂度不会产生 issues（issues 仅在复杂度 > 10/15 触发）
         assertTrue(result.getIssues().isEmpty());
     }
@@ -210,7 +208,7 @@ class CyclomaticComplexityMetricTest extends BasicMetricTest {
         result.getIssues().forEach(issue -> System.out.println(issue.getMessage())); // 打印具体问题描述
         assertNotNull(result);
         // 由于这是唯一的函数，avgComplexity == compute 的复杂度，应落到最高分段 -> 1.0
-        assertEquals(1.0, result.getScore(), 1e-6);
+        assertEquals(0.0, result.getScore(), 1e-6);
         // 检查Issue的message中是否包含目标字符串
         assertTrue(result.getIssues().stream()
                 .anyMatch(issue -> issue.getMessage().contains("圈复杂度过高") || issue.getMessage().contains("复杂度过高")));

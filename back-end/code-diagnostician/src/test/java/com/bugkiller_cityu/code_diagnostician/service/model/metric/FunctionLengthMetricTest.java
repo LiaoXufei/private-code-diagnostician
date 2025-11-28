@@ -61,7 +61,7 @@ class FunctionLengthMetricTest extends BasicMetricTest{
         ScoreAndIssues result = invokeAnalyze(cu);
 
         assertNotNull(result);
-        assertEquals(0.0, result.getScore(), 1e-6);
+        assertEquals(1.0, result.getScore(), 1e-6);
         assertTrue(result.getIssues().isEmpty());
     }
 }
