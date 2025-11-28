@@ -101,6 +101,7 @@
               <a-select-option value="active">活跃</a-select-option>
               <a-select-option value="inactive">非活跃</a-select-option>
               <a-select-option value="archived">已归档</a-select-option>
+              <a-select-option value="completed">已完成</a-select-option>
             </a-select>
           </a-col>
           <a-col :span="6">
