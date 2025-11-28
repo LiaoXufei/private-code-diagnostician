@@ -75,6 +75,8 @@
               :rules="analysisRules"
               layout="vertical"
             >
+              <!-- 排除规则 -->
+              <!--
               <a-form-item label="排除规则" name="excludeRules">
                 <a-select
                   v-model:value="analysisForm.excludeRules"
@@ -94,7 +96,9 @@
                   支持通配符，如 *.min.js、node_modules/**
                 </div>
               </a-form-item>
+              -->
 
+              <!--
               <a-row :gutter="16">
                 <a-col :span="8">
                   <a-form-item label="复杂度阈值" name="complexityThreshold">
@@ -129,7 +133,10 @@
                   </a-form-item>
                 </a-col>
               </a-row>
+              -->
 
+              <!-- 分析类型 -->
+              <!--
               <a-form-item label="分析类型" name="analysisTypes">
                 <a-checkbox-group v-model:value="analysisForm.analysisTypes">
                   <a-checkbox value="complexity">代码复杂度</a-checkbox>
@@ -141,6 +148,7 @@
                   <a-checkbox value="style">代码风格</a-checkbox>
                 </a-checkbox-group>
               </a-form-item>
+              -->
 
               <a-form-item label="包含测试文件" name="includeTests">
                 <a-switch v-model:checked="analysisForm.includeTests" />
@@ -209,6 +217,13 @@
             <a-button size="large" @click="goBack">
               <ArrowLeftOutlined />
               返回
+            </a-button>
+            <a-button
+              size="large"
+              @click="saveConfig"
+              :loading="saving"
+            >
+              保存
             </a-button>
             <a-button
               type="primary"
@@ -298,13 +313,13 @@ const saveConfig = async () => {
       config: analysisForm
     }
 
-    // 这里应该调用API保存配置
-    console.log('保存配置:', configData)
-
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    message.success('配置保存成功')
+  if (route.params.id) {
+      const updatedProject = await projectStore.updateProject(route.params.id, configData)
+      projectInfo.value = updatedProject
+      message.success('配置保存成功')
+    } else {
+      message.info('新建项目配置将在创建项目后保存')
+    }
   } catch (error) {
     console.error('保存配置失败:', error)
   } finally {
@@ -406,6 +421,7 @@ const saveAndNext = async () => {
 
     // 临时模拟项目创建（新项目）或更新（现有项目）
     if (route.params.id) {
+      await projectStore.updateProject(route.params.id, projectData)
       // 更新现有项目
       message.success('配置保存成功')
       router.push(`/project/${route.params.id}/upload`)
@@ -417,6 +433,7 @@ const saveAndNext = async () => {
         status: 'active',
         // createdAt: new Date().toISOString(),
         // updatedAt: new Date().toISOString(),
+        status: basicForm.status || 'active',
         fileCount: 0,
         lastAnalysis: null
       }

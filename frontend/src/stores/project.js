@@ -30,7 +30,8 @@ export const useProjectStore = defineStore('project', () => {
 
     try {
       const response = await projectApi.getProjects()
-      projects.value = response.data || []
+      const list = response.data || []
+      projects.value = list.map(p => ({ ...p, status: p.status || 'active' }))
 
       if (import.meta.env.DEV) {
         console.log('Projects fetched from API:', projects.value.length)
@@ -82,18 +83,19 @@ export const useProjectStore = defineStore('project', () => {
     try {
       const response = await projectApi.getProject(id)
       const project = response.data
+      const normalizedProject = { ...project, status: project.status || 'active' }
 
-      currentProject.value = project
+      currentProject.value = normalizedProject
 
       // 更新本地缓存
       const index = projects.value.findIndex(p => p.id === id)
       if (index >= 0) {
-        projects.value[index] = project
+        projects.value[index] = normalizedProject
       } else {
-        projects.value.push(project)
+        projects.value.push(normalizedProject)
       }
 
-      return project
+      return normalizedProject
     } catch (err) {
       error.value = err.message || '获取项目详情失败'
       message.error(error.value)
