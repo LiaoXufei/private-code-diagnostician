@@ -141,12 +141,11 @@ public class ErrorHandlingMetric extends BaseMetric implements Metric {
     }
 
     private double calculateScore(int ignoredErrors, int totalErrorReturns) {
-        if (totalErrorReturns == 0) return 0.4;
+        if (totalErrorReturns == 0) return 0.6;
 
         double ignoredRatio = (double) ignoredErrors / (double) totalErrorReturns;
-        double baseScore = 0.4;
-        double score = baseScore + ignoredRatio * 10.0;
+        double score = ignoredRatio * 10.0;
 
-        return Math.min(score, 1.0);
+        return 1.0 - Math.min(score, 1.0);
     }
 }

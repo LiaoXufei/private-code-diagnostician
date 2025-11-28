@@ -166,7 +166,7 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
 
         // 无命名项情况
         if (totalNames == 0) {
-            return new ScoreAndIssues(0.0, issues);
+            return new ScoreAndIssues(1.0, issues);
         }
 
         // 计算比例与得分
@@ -180,9 +180,8 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
      * 计分规则：基础分 0.4，每1%不良命名增加0.1分，最高1.0
      */
     private double calculateScore(double badRatio) {
-        double baseScore = 0.4;
         double increase = badRatio * 10.0;
-        double score = baseScore + increase;
-        return Math.min(score, 1.0);
+        double score = increase;
+        return 1.0 - Math.min(score, 1.0);
     }
 }

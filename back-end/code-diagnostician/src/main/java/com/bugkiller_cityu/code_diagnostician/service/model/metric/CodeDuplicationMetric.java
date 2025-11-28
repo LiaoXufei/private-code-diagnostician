@@ -33,7 +33,7 @@ public class CodeDuplicationMetric extends BaseMetric implements Metric{
         List<Issue> issues = new ArrayList<>();  // 改为Issue类型列表
         if (javaASTInfo == null){
             return new MetricResult(
-                    0.35,
+                    0.0,
                     issues,
                     this.getDescription(),
                     this.getWeight()
@@ -161,7 +161,7 @@ public class CodeDuplicationMetric extends BaseMetric implements Metric{
         double score = baseScore + (duplicationRate * increasePerPercent);
 
         // 限制范围
-        return Math.min(score, 1.0);
+        return 1.0 - Math.min(score, 1.0);
     }
 
     // 提取方法结构签名

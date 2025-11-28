@@ -27,7 +27,7 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
         List<Issue> issues = new ArrayList<>();  // 改为List<Issue>类型
         if (astInfo == null){
             return new MetricResult(
-                    0.3,
+                    0.7,
                     issues,
                     this.getDescription(),
                     this.getWeight()
@@ -246,13 +246,13 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
         }
 
         // 循环依赖分数
-        double circularScore = 0.5;
+        double circularScore = 0.0;
         if (circularCount > 0) {
             circularScore = 1.0;
         }
 
         // 导入问题分数
-        double importScore = 0.4;
+        double importScore = 0.0;
         if (importIssueCount > 0) {
             importScore += importIssueCount * 0.3;
         }
@@ -261,6 +261,6 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
         }
 
         // 综合得分
-        return nestingScore * 0.6 + circularScore * 0.25 + importScore * 0.15;
+        return (1.0 - nestingScore) * 0.6 + (1.0 - circularScore) * 0.25 + (1.0 - importScore) * 0.15;
     }
 }

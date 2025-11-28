@@ -23,7 +23,7 @@ public class CommentCoverageMetric extends BaseMetric implements Metric {
         }
         CompilationUnit cu = astInfo.getCompilationUnit();
         String filePath = (String) cu.getProperty("filePath");
-        if (astInfo == null || astInfo.getCompilationUnit() == null) {
+        if (astInfo.getCompilationUnit() == null) {
             // 创建无法解析AST的Issue
             Issue issue = createBaseIssue(
                     filePath,
@@ -161,6 +161,6 @@ public class CommentCoverageMetric extends BaseMetric implements Metric {
         double percent = ratio * 100;
         double score = baseScore - (percent * reducePerPercent);
         if (score < 0.0) score = 0.0;
-        return score;
+        return 1.0 - score;
     }
 }

@@ -158,7 +158,7 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
         double veryLongRatio = (double) veryLongFunctions / totalFunctions;
         double extremeLongRatio = (double) extremeLongFunctions / totalFunctions;
         double lengthScore = longRatio * 0.3 + veryLongRatio * 0.5 + extremeLongRatio * 0.8;
-        lengthScore = Math.min(lengthScore, 1.0);
+        lengthScore = 1.0 - Math.min(lengthScore, 1.0);
 
         // 计算复杂度评分
         double avgComplexity = (double) totalComplexity / totalFunctions;
@@ -180,10 +180,10 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
     }
 
     private double calculateComplexityScore(double avgComplexity) {
-        double baseScore = 0.4;
+        double baseScore = 0.1;
         double increasePerLevel = 0.1;
         double score = baseScore + (avgComplexity * increasePerLevel);
-        return Math.min(score, 1.0);
+        return 1.0 - Math.min(score, 1.0);
     }
 
     private ScoreAndIssues analyzeStateManagement(CompilationUnit cu) {
@@ -289,7 +289,7 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
             double globalRatio = (double) globalVars / totalVars.get();
             double mutableRatio = (double) mutableVars.get() / totalVars.get();
             score = globalRatio * 0.6 + mutableRatio * 0.4;
-            score = Math.min(score, 1.0);
+            score = 1.0 - Math.min(score, 1.0);
         }
 
         return new ScoreAndIssues(score, issues);

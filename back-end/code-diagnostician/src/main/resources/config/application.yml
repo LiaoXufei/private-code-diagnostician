@@ -10,7 +10,7 @@ spring:
     show-sql: true # 打印SQL日志（调试用）
     properties:
       hibernate:
-        format_sql: true # 格式化SQL
+        format_sql: false # 格式化SQL
         dialect: org.hibernate.community.dialect.SQLiteDialect # SQLite 方言
         jdbc:
           batch_size: 10 # 批量操作优化
