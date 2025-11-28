@@ -291,7 +291,7 @@
                 <a-button
                   type="primary"
                   block
-                  :disabled="!hasUploadedFiles"
+                  :disabled="hasUploadedFiles"
                   @click="startAnalysis"
                 >
                   <ExperimentOutlined />
@@ -299,19 +299,19 @@
                 </a-button>
                 <a-button
                   block
-                  :disabled="!hasUploadedFiles"
+                  :disabled="hasUploadedFiles"
                   @click="clearAllFiles"
                 >
                   <ClearOutlined />
                   清空文件
                 </a-button>
-                <a-button
-                  block
-                  @click="goToAnalysis"
-                >
-                  <RightOutlined />
-                  前往分析
-                </a-button>
+<!--                <a-button-->
+<!--                  block-->
+<!--                  @click="goToAnalysis"-->
+<!--                >-->
+<!--                  <RightOutlined />-->
+<!--                  前往分析-->
+<!--                </a-button>-->
               </a-space>
             </div>
           </a-card>

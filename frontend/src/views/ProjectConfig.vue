@@ -248,6 +248,8 @@ const saving = ref(false)
 const basicFormRef = ref()
 const analysisFormRef = ref()
 
+const projectStore = useProjectStore()
+
 const basicForm = reactive({
   name: '',
   description: '',
@@ -409,19 +411,20 @@ const saveAndNext = async () => {
       router.push(`/project/${route.params.id}/upload`)
     } else {
       // 创建新项目
-      const newProject = {
+      const newProjectData = {
         id: Date.now().toString(),
         ...projectData,
         status: 'active',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        // createdAt: new Date().toISOString(),
+        // updatedAt: new Date().toISOString(),
         fileCount: 0,
         lastAnalysis: null
       }
-
+      console.log('project:', projectData)
+      const newProject = await projectStore.createProject(newProjectData)
       // 添加到本地项目列表
-      const projectStore = useProjectStore()
-      projectStore.projects.push(newProject)
+      // const projectStore = useProjectStore()
+      // projectStore.projects.push(newProject)
 
       message.success('项目创建成功')
       router.push(`/project/${newProject.id}/upload`)

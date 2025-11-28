@@ -123,40 +123,40 @@
         </div>
       </a-form-item>
 
-      <a-row :gutter="16">
-        <a-col :span="8">
-          <a-form-item label="复杂度阈值" name="complexityThreshold">
-            <a-input-number
-              v-model:value="formData.config.thresholds.complexity"
-              :min="1"
-              :max="50"
-              style="width: 100%"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="可维护性指数" name="maintainabilityThreshold">
-            <a-input-number
-              v-model:value="formData.config.thresholds.maintainability"
-              :min="0"
-              :max="100"
-              style="width: 100%"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="8">
-          <a-form-item label="注释率" name="commentRateThreshold">
-            <a-input-number
-              v-model:value="formData.config.thresholds.commentRate"
-              :min="0"
-              :max="1"
-              :step="0.1"
-              :precision="2"
-              style="width: 100%"
-            />
-          </a-form-item>
-        </a-col>
-      </a-row>
+<!--      <a-row :gutter="16">-->
+<!--        <a-col :span="8">-->
+<!--          <a-form-item label="复杂度阈值" name="complexityThreshold">-->
+<!--            <a-input-number-->
+<!--              v-model:value="formData.config.thresholds.complexity"-->
+<!--              :min="1"-->
+<!--              :max="50"-->
+<!--              style="width: 100%"-->
+<!--            />-->
+<!--          </a-form-item>-->
+<!--        </a-col>-->
+<!--        <a-col :span="8">-->
+<!--          <a-form-item label="可维护性指数" name="maintainabilityThreshold">-->
+<!--            <a-input-number-->
+<!--              v-model:value="formData.config.thresholds.maintainability"-->
+<!--              :min="0"-->
+<!--              :max="100"-->
+<!--              style="width: 100%"-->
+<!--            />-->
+<!--          </a-form-item>-->
+<!--        </a-col>-->
+<!--        <a-col :span="8">-->
+<!--          <a-form-item label="注释率" name="commentRateThreshold">-->
+<!--            <a-input-number-->
+<!--              v-model:value="formData.config.thresholds.c ommentRate"-->
+<!--              :min="0"-->
+<!--              :max="1"-->
+<!--              :step="0.1"-->
+<!--              :precision="2"-->
+<!--              style="width: 100%"-->
+<!--            />-->
+<!--          </a-form-item>-->
+<!--        </a-col>-->
+<!--      </a-row>-->
     </a-form>
   </a-modal>
 </template>
