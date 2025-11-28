@@ -223,7 +223,8 @@ const handleSubmit = async () => {
     const projectData = {
       name: formData.name,
       description: formData.description || '',
-      language: formData.language
+      language: formData.language,
+      status: 'active'
     }
 
     console.log('发送创建项目请求:', projectData)

@@ -167,7 +167,7 @@ const getStatusColor = (status) => {
     inactive: 'orange',
     archived: 'gray'
   }
-  return colorMap[status] || 'default'
+  return colorMap[status] || 'green'
 }
 
 const getStatusText = (status) => {
@@ -176,7 +176,7 @@ const getStatusText = (status) => {
     inactive: '非活跃',
     archived: '已归档'
   }
-  return textMap[status] || '未知'
+  return textMap[status] || '活跃'
 }
 
 const getScoreStatus = (score) => {
