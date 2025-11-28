@@ -200,29 +200,33 @@ const createModalVisible = ref(false)
 
 // 计算属性
 const filteredProjects = computed(() => {
-  let projects = projectStore.projects
+  const search = searchText.value?.trim().toLowerCase()
+  const status = statusFilter.value
+  const lang = languageFilter.value
 
-  // 搜索过滤
-  if (searchText.value) {
-    const search = searchText.value.toLowerCase()
-    projects = projects.filter(project =>
-      project.name.toLowerCase().includes(search) ||
-      (project.description && project.description.toLowerCase().includes(search))
-    )
-  }
+  return projectStore.projects
+      .filter(p => {
+        // ① 搜索过滤
+        if (search) {
+          const nameMatch = p.name?.toLowerCase().includes(search)
+          const descMatch = p.description?.toLowerCase().includes(search)
+          if (!nameMatch && !descMatch) return false
+        }
 
-  // 状态过滤
-  if (statusFilter.value) {
-    projects = projects.filter(project => project.status === statusFilter.value)
-  }
+        // ② 状态过滤
+        if (status && p.status !== status) return false
 
-  // 语言过滤
-  if (languageFilter.value) {
-    projects = projects.filter(project => project.language === languageFilter.value)
-  }
+        // ③ 语言过滤
+        if (lang && p.language !== lang) return false
 
-  // 按创建时间倒序排列
-  return projects.sort((a, b) => new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt))
+        return true
+      })
+      .sort((a, b) => {
+        // 优先 createdAt，如果后端字段不同则都兼容
+        const t1 = new Date(a.created_at || a.createdAt)
+        const t2 = new Date(b.created_at || b.createdAt)
+        return t2 - t1 // 倒序
+      })
 })
 
 const completedAnalysisCount = computed(() => {
@@ -303,6 +307,7 @@ const refreshProjects = async () => {
     console.error('刷新项目列表失败:', error)
   }
 }
+
 
 const handleSearch = () => {
   // 搜索逻辑在计算属性中处理
