@@ -116,7 +116,7 @@ public class DefaultTranslator implements Translator {
         enTranslations.put("result.total_lines", "Total Lines: %d");
         // Report 模块
         enTranslations.put("report.title", "Code Quality Report");
-        enTranslations.put("report.overall_score", "Overall Score: %s%%");
+        enTranslations.put("report.overall_score", "Overall Score: %s");
         enTranslations.put("report.level", "Level: %s");
         enTranslations.put("report.section.metrics", "Metrics Overview");
         enTranslations.put("report.section.top_issues", "Top Issues");

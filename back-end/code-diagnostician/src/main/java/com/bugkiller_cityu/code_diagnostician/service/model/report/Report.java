@@ -66,7 +66,7 @@ public class Report {
             new QualityLevel(100, "level.disaster.ultimate", "level.disaster.ultimate.description", "💥")
     );
 
-    // 重要：生成报告主入口，返回可直接打印的字符串
+    // 生成报告主入口，返回可直接打印的字符串
     public String generateReport(AnalysisResult result, ReportOptions options) {
         if (options == null) options = new ReportOptions();
         return generateMarkdownReport(result, options);
@@ -109,7 +109,7 @@ public class Report {
         for (Map.Entry<String, MetricResult> e : ordered) {
             MetricResult m = e.getValue();
             double score = clamp01(m.getScore()) * 100.0;
-            sb.append(String.format(Locale.ROOT, "- %s: %.2f%% (w=%.2f) - %s\n", e.getKey(), score, m.getWeight(), nullSafe(m.getDescription())));
+            sb.append(String.format(Locale.ROOT, "- %s: %.2f (w=%.2f) - %s\n", e.getKey(), score, m.getWeight(), nullSafe(m.getDescription())));
         }
         return sb.toString();
     }
@@ -125,7 +125,7 @@ public class Report {
         for (Map.Entry<String, MetricResult> e : ordered) {
             MetricResult m = e.getValue();
             double score = clamp01(m.getScore()) * 100.0;
-            sb.append(String.format(Locale.ROOT, "| %s | %.2f%% | %.2f | %s |\n", e.getKey(), score, m.getWeight(), escapeMd(nullSafe(m.getDescription()))));
+            sb.append(String.format(Locale.ROOT, "| %s | %.2f | %.2f | %s |\n", e.getKey(), score, m.getWeight(), escapeMd(nullSafe(m.getDescription()))));
         }
         return sb.toString();
     }
@@ -138,7 +138,7 @@ public class Report {
                 .limit(Math.max(1, topFiles))
                 .collect(Collectors.toList());
         for (FileAnalysisResult f : ordered) {
-            sb.append(String.format(Locale.ROOT, "* %s (%.2f%%)\n", f.getFilePath(), clamp01(f.getFileScore()) * 100.0));
+            sb.append(String.format(Locale.ROOT, "* %s (%.2f)\n", f.getFilePath(), clamp01(f.getFileScore()) * 100.0));
             List<String> issues = takeIssues(f.getIssues(), maxIssues);
             for (String issue : issues) {
                 sb.append("  - ").append(issue).append("\n");
@@ -155,7 +155,7 @@ public class Report {
                 .limit(Math.max(1, topFiles))
                 .collect(Collectors.toList());
         for (FileAnalysisResult f : ordered) {
-            sb.append(String.format(Locale.ROOT, "- `%s` (%.2f%%)\n", f.getFilePath(), clamp01(f.getFileScore()) * 100.0));
+            sb.append(String.format(Locale.ROOT, "- `%s` (%.2f)\n", f.getFilePath(), clamp01(f.getFileScore()) * 100.0));
             List<String> issues = takeIssues(f.getIssues(), maxIssues);
             for (String issue : issues) {
                 sb.append("  - ").append(escapeMd(issue)).append("\n");
@@ -171,14 +171,15 @@ public class Report {
                 .sorted(Comparator.comparingDouble(f -> -clamp01(f.getFileScore())))
                 .collect(Collectors.toList());
         for (FileAnalysisResult f : ordered) {
-            sb.append(String.format(Locale.ROOT, "- `%s` (%.2f%%)\n", f.getFilePath(), clamp01(f.getFileScore()) * 100.0));
+            sb.append(String.format(Locale.ROOT, "- `%s` (%.2f)\n", f.getFilePath(), clamp01(f.getFileScore()) * 100.0));
             List<Issue> issues = f.getIssues() != null ? f.getIssues() : List.of();
             for (Issue is : issues) {
                 String file = is.getFile() != null ? is.getFile() : f.getFilePath();
                 String lineStr = is.getLine() != null ? String.valueOf(is.getLine()) : "-";
                 String sev = String.valueOf(is.getSeverity());
                 String msg = is.getMessage() != null ? is.getMessage() : "";
-                sb.append(String.format(Locale.ROOT, "  - [%s] %s:%s - %s\n", sev, escapeMd(file), lineStr, escapeMd(msg)));
+                String suggestion = is.getSuggestion() != null ? is.getSuggestion() : "";
+                sb.append(String.format(Locale.ROOT, "  - [%s] %s:%s - %s\nsuggestion: %s\n", sev, escapeMd(file), lineStr, escapeMd(msg), escapeMd(suggestion)));
             }
         }
         return sb.toString();
@@ -191,7 +192,7 @@ public class Report {
                 .sorted(Comparator.comparingDouble(f -> -clamp01(f.getFileScore())))
                 .collect(Collectors.toList());
         for (FileAnalysisResult f : ordered) {
-            sb.append(String.format(Locale.ROOT, "* %s (%.2f%%)\n", f.getFilePath(), clamp01(f.getFileScore()) * 100.0));
+            sb.append(String.format(Locale.ROOT, "* %s (%.2f)\n", f.getFilePath(), clamp01(f.getFileScore()) * 100.0));
             List<String> issues = takeIssues(f.getIssues(), maxIssues);
             for (String issue : issues) {
                 sb.append("  - ").append(issue).append("\n");
@@ -207,7 +208,7 @@ public class Report {
                 .sorted(Comparator.comparingDouble(f -> -clamp01(f.getFileScore())))
                 .collect(Collectors.toList());
         for (FileAnalysisResult f : ordered) {
-            sb.append(String.format(Locale.ROOT, "- `%s` (%.2f%%)\n", f.getFilePath(), clamp01(f.getFileScore()) * 100.0));
+            sb.append(String.format(Locale.ROOT, "- `%s` (%.2f)\n", f.getFilePath(), clamp01(f.getFileScore()) * 100.0));
             List<String> issues = takeIssues(f.getIssues(), maxIssues);
             for (String issue : issues) {
                 sb.append("  - ").append(escapeMd(issue)).append("\n");
@@ -220,7 +221,7 @@ public class Report {
         int fileCount = result.getTotalFiles();
         int totalLines = result.getTotalLines();
         double score = clamp01(result.getCodeQualityScore()) * 100.0;
-        return String.format(Locale.ROOT, "%s: %d | %s: %d | %s: %.2f%%",
+        return String.format(Locale.ROOT, "%s: %d | %s: %d | %s: %.2f",
                 t("report.summary.files"), fileCount,
                 t("report.summary.lines"), totalLines,
                 t("report.summary.score"), score);
@@ -230,7 +231,7 @@ public class Report {
         int fileCount = result.getTotalFiles();
         int totalLines = result.getTotalLines();
         double score = clamp01(result.getCodeQualityScore()) * 100.0;
-        return String.format(Locale.ROOT, "- %s: %d\n- %s: %d\n- %s: %.2f%%",
+        return String.format(Locale.ROOT, "- %s: %d\n- %s: %d\n- %s: %.2f",
                 t("report.summary.files"), fileCount,
                 t("report.summary.lines"), totalLines,
                 t("report.summary.score"), score);

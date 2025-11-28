@@ -90,7 +90,6 @@ export const useUploadStore = defineStore('upload', () => {
     try {
       const response = await uploadApi.importGitRepo(projectId, repoData)
       currentUploadTask.value = response.data
-
       message.success('Git仓库导入成功')
       return currentUploadTask.value
     } catch (err) {
