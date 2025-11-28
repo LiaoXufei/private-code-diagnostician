@@ -554,6 +554,7 @@ public abstract class Analyzer {
 
     // 内层：CodeAnalyzer - 核心分析层
     // CodeAnalyzer 代码分析器
+    @Component
     public static class CodeAnalyzer {
         private final Factory metricFactory;
         private Translator translator;
@@ -570,41 +571,44 @@ public abstract class Analyzer {
         public com.bugkiller_cityu.code_diagnostician.service.model.metric.AnalysisResult analyzeFile(String filePath) throws AnalysisException {
             try {
                 byte[] content = Files.readAllBytes(Paths.get(filePath));
-                int totalLines = (int) Files.lines(Paths.get(filePath)).count();
-                int commentLines = 0;
-                // 简单的行级注释统计（占位实现）
-                for (String line : Files.readAllLines(Paths.get(filePath))) {
-                    String t = line.trim();
-                    if (t.startsWith("//") || t.startsWith("#")) commentLines++;
+
+                com.bugkiller_cityu.code_diagnostician.service.model.parser.Parser parserImpl =
+                        com.bugkiller_cityu.code_diagnostician.service.model.parser.ParserFactory.createParserForFile(filePath);
+
+                com.bugkiller_cityu.code_diagnostician.service.model.parser.ParseResult parseResult;
+                try {
+                    parseResult = parserImpl.parse(filePath, content);
+                } catch (Exception e) {
+                    throw new AnalysisException("Failed to parse file: " + filePath, e);
                 }
 
-                com.bugkiller_cityu.code_diagnostician.service.model.parser.BaseParseResult parseResult =
-                        new com.bugkiller_cityu.code_diagnostician.service.model.parser.BaseParseResult(
-                                new ArrayList<>(),
-                                commentLines,
-                                totalLines,
-                                com.bugkiller_cityu.code_diagnostician.service.model.common.LanguageType.JAVA,
-                                null,
-                                content
-                        );
+                if (parseResult instanceof com.bugkiller_cityu.code_diagnostician.service.model.parser.BaseParseResult bp) {
+                    if (bp.getContent() == null || bp.getContent().length == 0) {
+                        bp.setContent(content);
+                    }
+                }
 
-                // 使用 Eclipse JDT 解析为 CompilationUnit，并设置到 ParseResult
-                ASTParser parser = ASTParser.newParser(AST.JLS21);
-                parser.setKind(ASTParser.K_COMPILATION_UNIT);
-                parser.setSource(new String(content).toCharArray());
-                parser.setResolveBindings(false);
-                CompilationUnit cu = (CompilationUnit) parser.createAST(null);
-                if (cu != null) {
-                    cu.setProperty("filePath", filePath);
-                    parseResult.setASTRoot(cu);
+                CompilationUnit cu = null;
+                if (parseResult.getLanguage() == com.bugkiller_cityu.code_diagnostician.service.model.common.LanguageType.JAVA) {
+                    ASTParser jdt = ASTParser.newParser(AST.JLS21);
+                    jdt.setKind(ASTParser.K_COMPILATION_UNIT);
+                    jdt.setSource(new String(content).toCharArray());
+                    jdt.setResolveBindings(false);
+                    cu = (CompilationUnit) jdt.createAST(null);
+                    if (cu != null) {
+                        cu.setProperty("filePath", filePath);
+                        if (parseResult instanceof com.bugkiller_cityu.code_diagnostician.service.model.parser.BaseParseResult bp2) {
+                            bp2.setASTRoot(cu);
+                        }
+                    }
                 }
 
                 com.bugkiller_cityu.code_diagnostician.service.model.metric.AnalysisResult result =
                         new com.bugkiller_cityu.code_diagnostician.service.model.metric.AnalysisResult();
                 result.setFilePath(filePath);
-                result.setTotalLines(totalLines);
-                result.setCommentLines(commentLines);
-                // 从 AST 提取 import 列表
+                result.setTotalLines(parseResult.getTotalLines());
+                result.setCommentLines(parseResult.getCommentLines());
+
                 List<String> imports = new ArrayList<>();
                 if (cu != null) {
                     for (Object obj : cu.imports()) {
@@ -615,7 +619,7 @@ public abstract class Analyzer {
                 }
                 result.setImports(imports);
                 result.setMetricResults(new HashMap<>());
-                result.setFunctions(new ArrayList<>());
+                result.setFunctions(parseResult.getFunctions());
                 result.setParseResult(parseResult);
 
                 for (com.bugkiller_cityu.code_diagnostician.service.model.metric.Metric metric : metricFactory.createAllMetrics()) {
