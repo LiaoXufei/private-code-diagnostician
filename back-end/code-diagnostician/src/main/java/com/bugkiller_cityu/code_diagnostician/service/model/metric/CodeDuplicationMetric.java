@@ -155,7 +155,7 @@ public class CodeDuplicationMetric extends BaseMetric implements Metric{
      * @return 计算后的得分（0~1）
      */
     public double calculateScore(double duplicationRate) {
-        double baseScore = 0.4;
+        double baseScore = 0.0;
         double increasePerPercent = 10.0;
 
         double score = baseScore + (duplicationRate * increasePerPercent);
