@@ -33,7 +33,7 @@ public class CodeDuplicationMetric extends BaseMetric implements Metric{
         List<Issue> issues = new ArrayList<>();  // 改为Issue类型列表
         if (javaASTInfo == null){
             return new MetricResult(
-                    0.0,
+                    0.6,
                     issues,
                     this.getDescription(),
                     this.getWeight()
@@ -80,6 +80,14 @@ public class CodeDuplicationMetric extends BaseMetric implements Metric{
 //            );
 //        }
 
+        if(totalFunctions == 0){
+            return new MetricResult(
+                    1,
+                    issues,
+                    this.getDescription(),
+                    this.getWeight()
+            );
+        }
         // 计算重复率和得分
         double duplicationRate = (double) duplicatedCount / totalFunctions;
         double score = calculateScore(duplicationRate);
@@ -156,7 +164,7 @@ public class CodeDuplicationMetric extends BaseMetric implements Metric{
      */
     public double calculateScore(double duplicationRate) {
         double baseScore = 0.0;
-        double increasePerPercent = 10.0;
+        double increasePerPercent = 1.0;
 
         double score = baseScore + (duplicationRate * increasePerPercent);
 

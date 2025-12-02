@@ -30,7 +30,7 @@ public class CyclomaticComplexityMetric extends BaseMetric implements Metric {
     public MetricResult analyze(ParseResult parseResult) {
         JavaASTInfo astInfo = JavaASTExtractor.extractJavaAST(parseResult);
         if (astInfo == null || astInfo.getCompilationUnit() == null) {
-            return new MetricResult(0.0, new ArrayList<>(), this.getDescription(), this.getWeight());
+            return new MetricResult(1.0, new ArrayList<>(), this.getDescription(), this.getWeight());
         }
 
         CompilationUnit cu = astInfo.getCompilationUnit();
@@ -90,7 +90,7 @@ public class CyclomaticComplexityMetric extends BaseMetric implements Metric {
 
         int totalFuncs = funcCount.get();
         if (totalFuncs == 0) {
-            return new ScoreAndIssues(0.0, issues);
+            return new ScoreAndIssues(1.0, issues);
         }
 
         double avgComplexity = totalComplexity.sum() / totalFuncs;
