@@ -237,7 +237,7 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
     // 计算结构得分（保持不变）
     public double calculateScore(int nestingDepth, int circularCount, int importIssueCount) {
         // 嵌套深度分数
-        double nestingScore = 0.4;
+        double nestingScore = 0.0;
         if (nestingDepth > 1) {
             nestingScore += (nestingDepth - 1) * 0.15;
         }
