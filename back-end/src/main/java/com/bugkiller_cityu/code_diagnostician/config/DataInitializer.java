@@ -108,13 +108,13 @@ public class DataInitializer implements CommandLineRunner {
 
         // 保存维度评分
         List<Dimension> dimensions = List.of(
-                createDimension(saved.getId(), "代码复杂度", 88, 100, 12),
-                createDimension(saved.getId(), "可维护性", 90, 100, 8),
-                createDimension(saved.getId(), "代码重复率", 85, 100, 6),
-                createDimension(saved.getId(), "安全性", 95, 100, 2),
-                createDimension(saved.getId(), "测试覆盖率", 89, 100, 5),
-                createDimension(saved.getId(), "代码规范", 93, 100, 3),
-                createDimension(saved.getId(), "性能", 90, 100, 4)
+                createDimension(saved.getId(), "圈复杂度分析", 88, 100, 12),
+                createDimension(saved.getId(), "状态管理", 90, 100, 8),
+                createDimension(saved.getId(), "代码重复度", 85, 100, 6),
+                createDimension(saved.getId(), "错误处理分析", 95, 100, 2),
+                createDimension(saved.getId(), "注释覆盖率分析", 89, 100, 5),
+                createDimension(saved.getId(), "命名规范", 93, 100, 3),
+                createDimension(saved.getId(), "结构分析", 90, 100, 4)
         );
         dimensionRepository.saveAll(dimensions);
         saved.setDimensions(dimensions);
@@ -134,13 +134,13 @@ public class DataInitializer implements CommandLineRunner {
         Analysis saved = analysisRepository.save(analysis);
 
         List<Dimension> dimensions = List.of(
-                createDimension(saved.getId(), "代码复杂度", 42, 100, 38),
-                createDimension(saved.getId(), "代码规范", 55, 100, 68),
-                createDimension(saved.getId(), "代码重复率", 60, 100, 23),
-                createDimension(saved.getId(), "安全性", 65, 100, 12),
-                createDimension(saved.getId(), "测试覆盖率", 25, 100, 45),
-                createDimension(saved.getId(), "可维护性", 42, 100, 38),
-                createDimension(saved.getId(), "性能", 68, 100, 15)
+                createDimension(saved.getId(), "圈复杂度分析", 42, 100, 38),
+                createDimension(saved.getId(), "命名规范", 55, 100, 68),
+                createDimension(saved.getId(), "代码重复度", 60, 100, 23),
+                createDimension(saved.getId(), "错误处理分析", 65, 100, 12),
+                createDimension(saved.getId(), "注释覆盖率分析", 25, 100, 45),
+                createDimension(saved.getId(), "状态管理", 42, 100, 38),
+                createDimension(saved.getId(), "结构分析", 68, 100, 15)
         );
         dimensionRepository.saveAll(dimensions);
         saved.setDimensions(dimensions);
