@@ -105,13 +105,13 @@ request.interceptors.response.use(
           message.error('拒绝访问')
           break
         case 404:
-          message.error('请求的资源不存在')
+          message.error(data?.message || '请求的资源不存在')
           break
         case 408:
           message.error('请求超时')
           break
         case 500:
-          message.error('服务器内部错误')
+          message.error(data?.message || '服务器内部错误')
           break
         case 502:
           message.error('网关错误')

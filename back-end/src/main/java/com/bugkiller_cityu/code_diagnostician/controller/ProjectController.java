@@ -2,6 +2,8 @@ package com.bugkiller_cityu.code_diagnostician.controller;
 
 import com.bugkiller_cityu.code_diagnostician.entity.*;
 import com.bugkiller_cityu.code_diagnostician.repository.*;
+import com.bugkiller_cityu.code_diagnostician.exception.ResourceNotFoundException;
+import com.bugkiller_cityu.code_diagnostician.exception.AnalysisFailedException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -40,6 +42,7 @@ public class ProjectController {
     private final AnalysisRepository analysisRepository;
     private final DimensionRepository dimensionRepository;
     private final IssueRepository issueRepository;
+    private final FileAnalysisResultRepository fileAnalysisResultRepository;
     private final com.bugkiller_cityu.code_diagnostician.service.model.analyzer.Analyzer.CodeAnalyzer codeAnalyzer;
     private final Report report;
 
@@ -227,7 +230,7 @@ public class ProjectController {
             Project project = enrichProjectWithLastAnalysis(projectOpt.get());
             return convertToMap(project);
         } else {
-            return Map.<String, Object>of("error", "项目不存在");
+            throw new ResourceNotFoundException("项目不存在");
         }
     }
 
@@ -244,7 +247,7 @@ public class ProjectController {
             Project updated = projectRepository.save(project);
             return convertToMap(enrichProjectWithLastAnalysis(updated));
         } else {
-            return Map.<String, Object>of("error", "项目不存在");
+            throw new ResourceNotFoundException("项目不存在");
         }
     }
 
@@ -270,7 +273,7 @@ public class ProjectController {
             projectRepository.delete(project);
             return Map.<String, Object>of("message", "项目删除成功", "id", id);
         } else {
-            return Map.<String, Object>of("error", "项目不存在");
+            throw new ResourceNotFoundException("项目不存在");
         }
     }
 
@@ -278,7 +281,7 @@ public class ProjectController {
     @GetMapping("/projects/{id}/files")
     public Map<String, Object> listFiles(@PathVariable String id) {
         if (!projectRepository.existsById(id)) {
-            return Map.<String, Object>of("error", "项目不存在");
+            throw new ResourceNotFoundException("项目不存在");
         }
         List<ProjectFile> files = fileRepository.findByProjectId(id);
         int totalFiles = files.size();
@@ -318,7 +321,7 @@ public class ProjectController {
     @PostMapping(value = "/projects/{id}/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Map<String, Object> upload(@PathVariable String id, @RequestPart("files") MultipartFile[] files) throws IOException {
         if (!projectRepository.existsById(id)) {
-            return Map.<String, Object>of("error", "项目不存在");
+            throw new ResourceNotFoundException("项目不存在");
         }
 
         List<ProjectFile> uploadedFiles = new ArrayList<>();
@@ -392,10 +395,10 @@ public class ProjectController {
                         )
                 );
             } else {
-                return Map.<String, Object>of("error", "文件不属于该项目");
+                throw new ResourceNotFoundException("文件不属于该项目");
             }
         } else {
-            return Map.<String, Object>of("error", "文件不存在");
+            throw new ResourceNotFoundException("文件不存在");
         }
     }
 
@@ -429,7 +432,7 @@ public class ProjectController {
                     )
             );
         } else {
-            return Map.<String, Object>of("error", "文件不存在");
+            throw new ResourceNotFoundException("文件不存在");
         }
     }
 
@@ -441,7 +444,7 @@ public class ProjectController {
         try {
             Optional<Project> projectOpt = projectRepository.findById(id);
             if (projectOpt.isEmpty()) {
-                return Map.<String, Object>of("error", "项目不存在");
+                throw new ResourceNotFoundException("项目不存在");
             }
 
             Project project = projectOpt.get();
@@ -455,17 +458,41 @@ public class ProjectController {
 
             List<ProjectFile> files = fileRepository.findByProjectId(id);
             List<com.bugkiller_cityu.code_diagnostician.service.model.metric.AnalysisResult> fileResults = new ArrayList<>();
+            List<FileAnalysisResult> fileAnalysisResults = new ArrayList<>();
+            List<String> analysisErrors = new ArrayList<>();
             for (ProjectFile f : files) {
                 String storedName = Paths.get(f.getFilePath()).getFileName().toString();
                 Path abs = Paths.get("uploads").resolve(id).resolve(storedName);
-                if (Files.exists(abs)) {
-                    try {
-                        com.bugkiller_cityu.code_diagnostician.service.model.metric.AnalysisResult r = codeAnalyzer.analyzeFile(abs.toString());
-                        fileResults.add(r);
-                    } catch (Exception ignored) {
-                        ignored.printStackTrace();
-                    }
+                if (!Files.exists(abs)) {
+                    continue;
                 }
+                try {
+                    com.bugkiller_cityu.code_diagnostician.service.model.metric.AnalysisResult r = codeAnalyzer.analyzeFile(abs.toString());
+                    fileResults.add(r);
+                    // 持久化文件级分析结果，避免 GET /analysis 每次重复静态分析
+                    int lines = r.getTotalLines();
+                    int issuesCount = r.getIssues() != null ? r.getIssues().size() : 0;
+                    int complexity = 0;
+                    var ccMr = r.getMetricResults().get("圈复杂度分析");
+                    if (ccMr != null && ccMr.getIssues() != null) complexity = ccMr.getIssues().size();
+                    int fileScore = (int) Math.round((1.0 - codeAnalyzer.calculateOverallScore(java.util.List.of(r))) * 100.0);
+                    FileAnalysisResult far = new FileAnalysisResult();
+                    far.setAnalysisId(savedAnalysis.getId());
+                    far.setFilename(f.getFilename());
+                    far.setScore(fileScore);
+                    far.setLinesOfCode(lines);
+                    far.setIssues(issuesCount);
+                    far.setComplexity(complexity);
+                    fileAnalysisResults.add(far);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    analysisErrors.add(f.getFilename() + ": " + e.getMessage());
+                }
+            }
+
+            // 全部文件均分析失败时抛错，避免 riskScore=0 被误判为"满分"
+            if (!files.isEmpty() && fileResults.isEmpty()) {
+                throw new AnalysisFailedException("项目分析失败，所有文件均无法分析" + (analysisErrors.isEmpty() ? "" : "：" + String.join("; ", analysisErrors)));
             }
 
             double riskScore = fileResults.isEmpty() ? 0.0 : codeAnalyzer.calculateOverallScore(fileResults);
@@ -491,6 +518,7 @@ public class ProjectController {
                 dimensions.add(createDimension(savedAnalysis.getId(), name, dimScore, 100, issuesCount));
             }
             if (!dimensions.isEmpty()) dimensionRepository.saveAll(dimensions);
+            if (!fileAnalysisResults.isEmpty()) fileAnalysisResultRepository.saveAll(fileAnalysisResults);
 
             List<Issue> allIssues = new ArrayList<>();
             for (var fr : fileResults) {
@@ -532,8 +560,10 @@ public class ProjectController {
                             "created_at", savedAnalysis.getCreatedAt().toString()
                     )
             );
+        } catch (AnalysisFailedException e) {
+            throw e;
         } catch (Exception e) {
-            return Map.of("error", "分析失败", "details", e.getMessage());
+            throw new AnalysisFailedException("分析失败：" + e.getMessage());
         }
     }
 
@@ -547,14 +577,21 @@ public class ProjectController {
             projectRepository.save(project);
             return Map.of("message", "已取消分析", "projectId", id, "status", "cancelled");
         } else {
-            return Map.<String, Object>of("error", "项目不存在");
+            throw new ResourceNotFoundException("项目不存在");
         }
+    }
+
+    @PostMapping("/projects/{id}/reanalyze")
+    @Transactional
+    public Map<String, Object> reanalyze(@PathVariable String id) {
+        // 重新分析等价于再次触发 analyze：每次新建 Analysis 记录，历史自动保留
+        return analyze(id);
     }
 
     @GetMapping("/projects/{id}/analysis")
     public Map<String, Object> getAnalysis(@PathVariable String id) {
         if (!projectRepository.existsById(id)) {
-            return Map.<String, Object>of("error", "项目不存在");
+            throw new ResourceNotFoundException("项目不存在");
         }
 
         Optional<Analysis> analysisOpt = analysisRepository.findTopByProjectIdOrderByCreatedAtDesc(id);
@@ -585,29 +622,18 @@ public class ProjectController {
                 return m;
             }).collect(Collectors.toList());
 
-            List<Map<String, Object>> fileResults = new ArrayList<>();
-            List<ProjectFile> pfiles = fileRepository.findByProjectId(id);
-            for (ProjectFile pf : pfiles) {
-                String stored = Paths.get(pf.getFilePath()).getFileName().toString();
-                Path abs = Paths.get("uploads").resolve(id).resolve(stored);
-                if (!Files.exists(abs)) continue;
-                try {
-                    com.bugkiller_cityu.code_diagnostician.service.model.metric.AnalysisResult r = codeAnalyzer.analyzeFile(abs.toString());
-                    int lines = r.getTotalLines();
-                    int issuesCount = r.getIssues() != null ? r.getIssues().size() : 0;
-                    int score = (int) Math.round((1.0 - codeAnalyzer.calculateOverallScore(java.util.List.of(r))) * 100.0);
-                    int complexity = 0;
-                    var mr = r.getMetricResults().get("圈复杂度分析");
-                    if (mr != null && mr.getIssues() != null) complexity = mr.getIssues().size();
-                    Map<String, Object> fm = new LinkedHashMap<>();
-                    fm.put("file", pf.getFilename());
-                    fm.put("score", score);
-                    fm.put("issues", issuesCount);
-                    fm.put("linesOfCode", lines);
-                    fm.put("complexity", complexity);
-                    fileResults.add(fm);
-                } catch (Exception ignored) {}
-            }
+            // 直接读取已持久化的文件级分析结果，避免每次请求重复静态分析
+            List<Map<String, Object>> fileResults = fileAnalysisResultRepository.findByAnalysisId(analysis.getId()).stream()
+                    .map(fr -> {
+                        Map<String, Object> fm = new LinkedHashMap<>();
+                        fm.put("file", fr.getFilename());
+                        fm.put("score", fr.getScore());
+                        fm.put("issues", fr.getIssues());
+                        fm.put("linesOfCode", fr.getLinesOfCode());
+                        fm.put("complexity", fr.getComplexity());
+                        return fm;
+                    })
+                    .collect(Collectors.toList());
 
             Map<String, Object> resp = new LinkedHashMap<>();
             resp.put("projectId", id);
@@ -623,7 +649,7 @@ public class ProjectController {
             resp.put("summary", summary);
             return resp;
         } else {
-            return Map.<String, Object>of("error", "该项目暂无分析结果");
+            throw new ResourceNotFoundException("该项目暂无分析结果");
         }
     }
 
@@ -657,7 +683,7 @@ public class ProjectController {
                     "updatedAt", project.getUpdatedAt().toString()
             );
         } else {
-            return Map.<String, Object>of("error", "项目不存在");
+            throw new ResourceNotFoundException("项目不存在");
         }
     }
 
@@ -704,22 +730,19 @@ public class ProjectController {
                     "totalLogs", logs.size()
             );
         } else {
-            return Map.<String, Object>of("error", "项目不存在");
+            throw new ResourceNotFoundException("项目不存在");
         }
     }
 
     @GetMapping("/projects/{id}/analysis/history")
     public List<Map<String, Object>> getHistory(@PathVariable String id) {
-        List<Map<String, Object>> result = new ArrayList<>();
         if (!projectRepository.existsById(id)) {
-            result.add(Map.<String, Object>of("error", "项目不存在"));
-            return result;
+            throw new ResourceNotFoundException("项目不存在");
         }
 
         List<Analysis> analyses = analysisRepository.findByProjectIdOrderByCreatedAtDesc(id);
         if (analyses.isEmpty()) {
-            result.add(Map.<String, Object>of("error", "该项目暂无分析历史"));
-            return result;
+            return List.of();
         }
 
         return analyses.stream()
@@ -744,7 +767,7 @@ public class ProjectController {
             projectRepository.save(project);
             return Map.of("message", "导入成功", "repo", repo, "taskId", UUID.randomUUID().toString());
         } else {
-            return Map.<String, Object>of("error", "项目不存在");
+            throw new ResourceNotFoundException("项目不存在");
         }
     }
 
@@ -796,7 +819,7 @@ public class ProjectController {
 
             return convertToMap(enrichProjectWithLastAnalysis(savedProject));
         } else {
-            return Map.<String, Object>of("error", "项目不存在");
+            throw new ResourceNotFoundException("项目不存在");
         }
     }
 
@@ -810,7 +833,7 @@ public class ProjectController {
             Project updated = projectRepository.save(project);
             return convertToMap(enrichProjectWithLastAnalysis(updated));
         } else {
-            return Map.<String, Object>of("error", "项目不存在");
+            throw new ResourceNotFoundException("项目不存在");
         }
     }
 
@@ -824,7 +847,7 @@ public class ProjectController {
             Project updated = projectRepository.save(project);
             return convertToMap(enrichProjectWithLastAnalysis(updated));
         } else {
-            return Map.<String, Object>of("error", "项目不存在");
+            throw new ResourceNotFoundException("项目不存在");
         }
     }
 

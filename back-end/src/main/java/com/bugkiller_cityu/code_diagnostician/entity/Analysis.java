@@ -36,6 +36,10 @@ public class Analysis {
     @OneToMany(mappedBy = "analysis", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Issue> issues;
 
+    // 关联文件级分析结果（每个文件的 score/linesOfCode/issues/complexity，避免每次查询重复分析）
+    @OneToMany(mappedBy = "analysis", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<FileAnalysisResult> fileResults;
+
     // 级联删除：删除项目时删除关联分析
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "projectId", referencedColumnName = "id", insertable = false, updatable = false)
