@@ -10,7 +10,8 @@ yarn-error.log*
 
 # Production builds
 /frontend/dist/
-/backend/uploads/
+back-end/code-diagnostician/uploads/
+杂项/uploads/
 /backend/code_quality_analyzer.db
 /backend/code_quality_analyzer.db-journal
 

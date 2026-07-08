@@ -23,26 +23,40 @@
         <java.version>21</java.version>
     </properties>
 
-        <dependencies>
+    <dependencies>
+        <!-- Spring Boot Web starter: 提供Web应用开发所需的核心功能 -->
+        <!-- 包含Tomcat服务器、Spring MVC、RESTful服务支持等 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+
+        <!-- Spring Boot Web starter: 提供Web应用开发所需的核心功能 -->
+        <!-- 包含Tomcat服务器、Spring MVC、RESTful服务支持等 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
+
+        <!-- Lombok: Java代码简化工具 -->
+        <!-- 通过注解自动生成getter/setter/构造函数等，减少样板代码 -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <version>1.18.30</version>
             <optional>true</optional>
         </dependency>
+
+        <!-- Spring Boot Test starter: 提供单元测试和集成测试支持 -->
+        <!-- 包含JUnit、Mockito等测试框架 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- MyBatis Spring Boot Test starter: MyBatis测试支持 -->
+        <!-- 用于测试MyBatis相关的数据访问层 -->
         <dependency>
             <groupId>org.mybatis.spring.boot</groupId>
             <artifactId>mybatis-spring-boot-starter-test</artifactId>
@@ -51,6 +65,9 @@
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/org.eclipse.jdt/org.eclipse.jdt.core -->
+        <!-- Eclipse JDT Core: Java开发工具核心库 -->
+        <!-- 提供Java源代码解析、AST抽象语法树分析等功能 -->
+        <!-- 用于代码静态分析和质量检测 -->
         <dependency>
             <groupId>org.eclipse.jdt</groupId>
             <artifactId>org.eclipse.jdt.core</artifactId>
@@ -58,6 +75,8 @@
         </dependency>
 
         <!-- SQLite驱动 -->
+        <!-- SQLite JDBC驱动: SQLite数据库连接驱动 -->
+        <!-- 轻量级嵌入式数据库，适合本地存储和开发测试 -->
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
@@ -65,29 +84,49 @@
         </dependency>
 
         <!-- Hibernate SQLite方言（社区版） -->
+        <!-- Hibernate社区方言: 提供Hibernate对SQLite的支持 -->
+        <!-- 解决Hibernate与SQLite数据库的兼容性问题 -->
         <dependency>
             <groupId>org.hibernate.orm</groupId>
             <artifactId>hibernate-community-dialects</artifactId>
             <version>6.4.3.Final</version>
         </dependency>
 
+        <!-- Flexmark: Markdown处理器 -->
+        <!-- 支持Markdown文本解析和转换为HTML等功能 -->
+        <!-- 可能用于生成代码分析报告或文档 -->
         <dependency>
             <groupId>com.vladsch.flexmark</groupId>
             <artifactId>flexmark-all</artifactId>
             <version>0.64.8</version>
         </dependency>
+
+        <!-- Open HTML to PDF Box: HTML转PDF工具 -->
+        <!-- 基于PDFBox引擎，用于将HTML内容转换为PDF格式 -->
+        <!-- 可能用于生成代码分析报告的PDF版本 -->
         <dependency>
             <groupId>com.openhtmltopdf</groupId>
             <artifactId>openhtmltopdf-pdfbox</artifactId>
             <version>1.0.10</version>
         </dependency>
+
+        <!-- Open HTML to PDF SLF4J: 日志桥接器 -->
+        <!-- 为OpenHTMLToPDF提供SLF4J日志支持 -->
         <dependency>
             <groupId>com.openhtmltopdf</groupId>
             <artifactId>openhtmltopdf-slf4j</artifactId>
             <version>1.0.10</version>
         </dependency>
 
+        <!-- Source: https://mvnrepository.com/artifact/junit/junit -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.2</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
+
     <build>
         <plugins>
             <plugin>
