@@ -136,3 +136,5 @@ package-lock.json
 
 ### SQLite ###
 .db
+
+.cursorrules

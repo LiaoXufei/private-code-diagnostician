@@ -75,7 +75,7 @@ public class ProjectController {
             }
         } catch (Exception ignored) {}
         Analyzer.AnalysisResult ar = new Analyzer.AnalysisResult(
-                overall / 100.0,
+                (100 - overall) / 100.0,
                 new HashMap<>(),
                 new ArrayList<>(),
                 project.getFileCount(),
@@ -86,7 +86,7 @@ public class ProjectController {
             for (Dimension d : dims) {
                 ar.addMetric(d.getName(), new Analyzer.MetricResult(
                         d.getName(),
-                        Math.max(0.0, Math.min(1.0, d.getScore() / 100.0)),
+                        Math.max(0.0, Math.min(1.0, (100 - d.getScore()) / 100.0)),
                         d.getName(),
                         0.1
                 ));
@@ -100,7 +100,7 @@ public class ProjectController {
             for (Map.Entry<String, List<Issue>> e : byFile.entrySet()) {
                 ar.addFileAnalysisResult(new Analyzer.FileAnalysisResult(
                         e.getKey(),
-                        Math.max(0.0, Math.min(1.0, overall / 100.0)),
+                        Math.max(0.0, Math.min(1.0, (100 - overall) / 100.0)),
                         e.getValue()
                 ));
             }
@@ -165,7 +165,7 @@ public class ProjectController {
             }
         } catch (Exception ignored) {}
         Analyzer.AnalysisResult ar = new Analyzer.AnalysisResult(
-                overall / 100.0,
+                (100 - overall) / 100.0,
                 new HashMap<>(),
                 new ArrayList<>(),
                 project.getFileCount(),
@@ -176,7 +176,7 @@ public class ProjectController {
             for (Dimension d : dims) {
                 ar.addMetric(d.getName(), new Analyzer.MetricResult(
                         d.getName(),
-                        Math.max(0.0, Math.min(1.0, d.getScore() / 100.0)),
+                        Math.max(0.0, Math.min(1.0, (100 - d.getScore()) / 100.0)),
                         d.getName(),
                         0.1
                 ));
@@ -190,7 +190,7 @@ public class ProjectController {
             for (Map.Entry<String, List<Issue>> e : byFile.entrySet()) {
                 ar.addFileAnalysisResult(new Analyzer.FileAnalysisResult(
                         e.getKey(),
-                        Math.max(0.0, Math.min(1.0, overall / 100.0)),
+                        Math.max(0.0, Math.min(1.0, (100 - overall) / 100.0)),
                         e.getValue()
                 ));
             }
@@ -469,7 +469,8 @@ public class ProjectController {
             }
 
             double riskScore = fileResults.isEmpty() ? 0.0 : codeAnalyzer.calculateOverallScore(fileResults);
-            int overallInt = (int) Math.round(riskScore * 100.0);
+            // 底层 riskScore 为风险分（0-1，越高越差），统一换算为质量分（0-100，越高越好）后再入库
+            int overallInt = fileResults.isEmpty() ? 0 : (int) Math.round((1.0 - riskScore) * 100.0);
             String grade = overallInt >= 80 ? "excellent" : overallInt >= 60 ? "good" : "poor";
 
             Map<String, List<com.bugkiller_cityu.code_diagnostician.service.model.metric.MetricResult>> metricsMap = new LinkedHashMap<>();
@@ -486,7 +487,7 @@ public class ProjectController {
                 List<com.bugkiller_cityu.code_diagnostician.service.model.metric.MetricResult> mrs = entry.getValue();
                 double avgRisk = mrs.stream().mapToDouble(com.bugkiller_cityu.code_diagnostician.service.model.metric.MetricResult::getScore).average().orElse(0.0);
                 int issuesCount = mrs.stream().mapToInt(m -> m.getIssues() == null ? 0 : m.getIssues().size()).sum();
-                int dimScore = (int) Math.round(avgRisk * 100.0);
+                int dimScore = (int) Math.round((1.0 - avgRisk) * 100.0);
                 dimensions.add(createDimension(savedAnalysis.getId(), name, dimScore, 100, issuesCount));
             }
             if (!dimensions.isEmpty()) dimensionRepository.saveAll(dimensions);
@@ -594,7 +595,7 @@ public class ProjectController {
                     com.bugkiller_cityu.code_diagnostician.service.model.metric.AnalysisResult r = codeAnalyzer.analyzeFile(abs.toString());
                     int lines = r.getTotalLines();
                     int issuesCount = r.getIssues() != null ? r.getIssues().size() : 0;
-                    int score = (int) Math.round(codeAnalyzer.calculateOverallScore(java.util.List.of(r)) * 100.0);
+                    int score = (int) Math.round((1.0 - codeAnalyzer.calculateOverallScore(java.util.List.of(r))) * 100.0);
                     int complexity = 0;
                     var mr = r.getMetricResults().get("圈复杂度分析");
                     if (mr != null && mr.getIssues() != null) complexity = mr.getIssues().size();
