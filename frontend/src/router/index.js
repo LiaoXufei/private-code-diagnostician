@@ -79,16 +79,17 @@ const routes = [
               parent: 'project'
             }
           },
-          {
-            path: 'optimize',
-            name: 'CodeOptimize',
-            component: () => import('@/views/CodeOptimize.vue'),
-            meta: {
-              title: 'AI优化建议',
-              icon: 'BulbOutlined',
-              parent: 'project'
-            }
-          },
+          // AI 优化建议路由暂隐藏（CodeOptimize.vue 仍为占位页）
+          // {
+          //   path: 'optimize',
+          //   name: 'CodeOptimize',
+          //   component: () => import('@/views/CodeOptimize.vue'),
+          //   meta: {
+          //     title: 'AI优化建议',
+          //     icon: 'BulbOutlined',
+          //     parent: 'project'
+          //   }
+          // },
           {
             path: 'history',
             name: 'History',

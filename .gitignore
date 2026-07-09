@@ -1,7 +1,6 @@
 # Compiled class file
 *.class
 
-# Log file
 # Dependencies
 node_modules/
 npm-debug.log*
@@ -10,10 +9,18 @@ yarn-error.log*
 
 # Production builds
 /frontend/dist/
-back-end/code-diagnostician/uploads/
+frontend/dist/
+
+# Uploads & local DB (current layout: back-end/)
+back-end/uploads/
+back-end/*.db
+back-end/*.db-journal
 杂项/uploads/
-/backend/code_quality_analyzer.db
-/backend/code_quality_analyzer.db-journal
+
+# Maven / build output
+**/target/
+!**/src/main/**/target/
+!**/src/test/**/target/
 
 # Environment variables
 .env
@@ -21,13 +28,21 @@ back-end/code-diagnostician/uploads/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.test
 
 # IDE files
 .vscode/
+.vscode/*
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
 *~
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
 # OS generated files
 .DS_Store
@@ -42,55 +57,12 @@ Thumbs.db
 logs
 *.log
 
-# BlueJ files
-*.ctxt
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
+# Coverage
 coverage/
 *.lcov
-
-# nyc test coverage
 .nyc_output
 
-# Dependency directories
-jspm_packages/
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# dotenv environment variables file
-.env.test
-
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# Package Files #
+# Package archives
 *.jar
 *.war
 *.nar
@@ -98,43 +70,26 @@ jspm_packages/
 *.zip
 *.tar.gz
 *.rar
-# Next.js build output
-.next
 
-# Nuxt.js build / generate output
-.nuxt
-dist
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
-replay_pid*
+# Caches
+.cache
+.parcel-cache
+.npm
+.eslintcache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
 
-# Gatsby files
-.cache/
-public
-
-# Storybook build outputs
-.out
-.storybook-out
-
-# Temporary folders
+# Temporary
 tmp/
 temp/
-
-# Claude AI files
 .claude/
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-package-lock.json
-
-### SQLite ###
+# SQLite
 .db
+*.db
 
+# Cursor
 .cursorrules
+package-lock.json

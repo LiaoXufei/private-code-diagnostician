@@ -1,6 +1,10 @@
 server:
   port: 9999
 
+# 上传文件根目录（相对路径相对于进程工作目录；建议生产环境改为绝对路径）
+app:
+  upload-dir: uploads
+
 spring:
   datasource:
     url: jdbc:sqlite:springboot-sqlite-jpa.db

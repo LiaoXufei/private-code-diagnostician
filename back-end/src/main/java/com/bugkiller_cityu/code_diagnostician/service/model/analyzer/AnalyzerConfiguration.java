@@ -1,6 +1,5 @@
 package com.bugkiller_cityu.code_diagnostician.service.model.analyzer;
 
-import com.bugkiller_cityu.code_diagnostician.service.MetricService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -43,11 +42,8 @@ public class AnalyzerConfiguration {
      * @return 配置好的代码分析引擎实例
      */
     @Bean
-    public CodeAnalyzer codeAnalyzer(Translator translator, Factory factory, MetricService metricService) {
-        // 注意：Analyzer.CodeAnalyzer的构造函数期望MetricFactory类型
-        // 但实际上metric模块使用的是Factory类名
-        // 这里需要修复Analyzer.java中的类型引用
-        return new Analyzer.CodeAnalyzer(translator, factory, metricService);
+    public CodeAnalyzer codeAnalyzer(Translator translator, Factory factory) {
+        return new Analyzer.CodeAnalyzer(translator, factory);
     }
 
     

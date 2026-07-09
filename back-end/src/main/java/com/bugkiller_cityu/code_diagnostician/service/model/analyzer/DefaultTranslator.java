@@ -135,6 +135,7 @@ public class DefaultTranslator implements Translator {
         enTranslations.put("report.score.good", "Good");
         enTranslations.put("report.score.average", "Average");
         enTranslations.put("report.score.poor", "Poor");
+        enTranslations.put("suggestion.optimize_dimension", "Improve code related to %s");
         // Quality levels
         enTranslations.put("level.clean", "Clean");
         enTranslations.put("level.clean.description", "Codebase is clean and well-structured");
@@ -194,6 +195,7 @@ public class DefaultTranslator implements Translator {
         zhTranslations.put("report.score.good", "良好");
         zhTranslations.put("report.score.average", "及格");
         zhTranslations.put("report.score.poor", "不及格");
+        zhTranslations.put("suggestion.optimize_dimension", "优化%s相关代码");
         // Quality levels
         zhTranslations.put("level.clean", "洁净");
         zhTranslations.put("level.clean.description", "代码整洁、结构良好");
@@ -232,6 +234,7 @@ public class DefaultTranslator implements Translator {
         ruTranslations.put("result.quality_score", "Оценка качества кода: %.2f");
         ruTranslations.put("result.total_files", "Всего файлов: %d");
         ruTranslations.put("result.total_lines", "Всего строк: %d");
+        ruTranslations.put("suggestion.optimize_dimension", "Улучшите код, связанный с %s");
         translations.put(Language.RU_RU, ruTranslations);
     }
 }

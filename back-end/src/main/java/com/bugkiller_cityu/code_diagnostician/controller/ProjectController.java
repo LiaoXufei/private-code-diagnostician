@@ -1,7 +1,9 @@
 package com.bugkiller_cityu.code_diagnostician.controller;
 
+import com.bugkiller_cityu.code_diagnostician.config.AppProperties;
 import com.bugkiller_cityu.code_diagnostician.entity.*;
 import com.bugkiller_cityu.code_diagnostician.repository.*;
+import com.bugkiller_cityu.code_diagnostician.exception.BadRequestException;
 import com.bugkiller_cityu.code_diagnostician.exception.ResourceNotFoundException;
 import com.bugkiller_cityu.code_diagnostician.service.AnalysisService;
 import jakarta.transaction.Transactional;
@@ -36,12 +38,19 @@ import com.bugkiller_cityu.code_diagnostician.service.model.analyzer.Analyzer;
 @RequestMapping("/api")
 @RequiredArgsConstructor
 public class ProjectController {
+    private static final int MAX_FILES_PER_PROJECT = 200;
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+            ".java", ".js", ".ts", ".jsx", ".tsx", ".vue", ".py", ".go",
+            ".c", ".cpp", ".h", ".hpp", ".cs", ".rs", ".lua", ".md", ".json", ".xml", ".yml", ".yaml", ".txt"
+    );
+
     private final ProjectRepository projectRepository;
     private final ProjectFileRepository fileRepository;
     private final AnalysisRepository analysisRepository;
     private final FileAnalysisResultRepository fileAnalysisResultRepository;
     private final AnalysisService analysisService;
     private final Report report;
+    private final AppProperties appProperties;
 
     // -------------------------- 项目管理 --------------------------
     @GetMapping("/projects")
@@ -63,23 +72,13 @@ public class ProjectController {
         Project project = projectOpt.get();
         Optional<Analysis> latestOpt = analysisRepository.findTopByProjectIdOrderByCreatedAtDesc(id);
         int overall = latestOpt.map(Analysis::getOverallScore).orElse(0);
-        int totalLines = 0;
-        try {
-            List<ProjectFile> pfiles = fileRepository.findByProjectId(id);
-            for (ProjectFile pf : pfiles) {
-                String storedName = Paths.get(pf.getFilePath()).getFileName().toString();
-                Path abs = Paths.get("uploads").resolve(id).resolve(storedName);
-                if (Files.exists(abs)) {
-                    totalLines += (int) Files.lines(abs).count();
-                }
-            }
-        } catch (Exception ignored) {}
+        long totalLines = resolveTotalLines(id, latestOpt);
         Analyzer.AnalysisResult ar = new Analyzer.AnalysisResult(
                 (100 - overall) / 100.0,
                 new HashMap<>(),
                 new ArrayList<>(),
                 project.getFileCount(),
-                totalLines
+                (int) Math.min(Integer.MAX_VALUE, totalLines)
         );
         latestOpt.ifPresent(latest -> {
             List<Dimension> dims = latest.getDimensions() != null ? latest.getDimensions() : List.of();
@@ -118,10 +117,25 @@ public class ProjectController {
         sb.append("<html xmlns=\"http://www.w3.org/1999/xhtml\">\n");
         sb.append("<head>\n");
         sb.append("  <meta charset=\"utf-8\"/>\n");
-        sb.append("  <title>报告</title>\n");
-        sb.append("  <style>body{font-family:Arial,\"Microsoft YaHei\",sans-serif;padding:24px;line-height:1.6;} h1,h2,h3{margin:16px 0;} table{border-collapse:collapse;width:100%;} th,td{border:1px solid #ddd;padding:8px;} code,pre{background:#f6f8fa;padding:8px;border-radius:4px;} </style>\n");
+        sb.append("  <title>").append(escapeHtml(project.getName())).append(" - 代码质量报告</title>\n");
+        sb.append("  <style>\n");
+        sb.append("    body{font-family:\"Segoe UI\",\"Microsoft YaHei\",Arial,sans-serif;padding:32px;line-height:1.7;color:#1f2937;background:#fafafa;}\n");
+        sb.append("    h1{font-size:28px;border-bottom:3px solid #2563eb;padding-bottom:12px;color:#111827;}\n");
+        sb.append("    h2{font-size:20px;margin-top:28px;color:#1e40af;border-left:4px solid #3b82f6;padding-left:12px;}\n");
+        sb.append("    h3{font-size:16px;margin-top:20px;color:#374151;}\n");
+        sb.append("    table{border-collapse:collapse;width:100%;margin:16px 0;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);}\n");
+        sb.append("    th{background:#eff6ff;color:#1e3a8a;font-weight:600;text-align:left;}\n");
+        sb.append("    th,td{border:1px solid #e5e7eb;padding:10px 12px;font-size:14px;}\n");
+        sb.append("    tr:nth-child(even){background:#f9fafb;}\n");
+        sb.append("    code,pre{background:#f3f4f6;padding:8px 12px;border-radius:6px;font-family:Consolas,\"Courier New\",monospace;font-size:13px;}\n");
+        sb.append("    pre{overflow-x:auto;border:1px solid #e5e7eb;}\n");
+        sb.append("    .meta{color:#6b7280;font-size:13px;margin-bottom:24px;}\n");
+        sb.append("  </style>\n");
         sb.append("</head>\n");
         sb.append("<body>\n");
+        sb.append("<p class=\"meta\">项目：").append(escapeHtml(project.getName()))
+                .append(" · 质量分：").append(overall)
+                .append(" · 总行数：").append(totalLines).append("</p>\n");
         sb.append(htmlBody);
         sb.append("\n</body>\n</html>");
         String fullHtml = sb.toString();
@@ -153,23 +167,13 @@ public class ProjectController {
 
         Optional<Analysis> latestOpt = analysisRepository.findTopByProjectIdOrderByCreatedAtDesc(id);
         int overall = latestOpt.map(Analysis::getOverallScore).orElse(0);
-        int totalLines = 0;
-        try {
-            List<ProjectFile> pfiles = fileRepository.findByProjectId(id);
-            for (ProjectFile pf : pfiles) {
-                String storedName = Paths.get(pf.getFilePath()).getFileName().toString();
-                Path abs = Paths.get("uploads").resolve(id).resolve(storedName);
-                if (Files.exists(abs)) {
-                    totalLines += (int) Files.lines(abs).count();
-                }
-            }
-        } catch (Exception ignored) {}
+        long totalLines = resolveTotalLines(id, latestOpt);
         Analyzer.AnalysisResult ar = new Analyzer.AnalysisResult(
                 (100 - overall) / 100.0,
                 new HashMap<>(),
                 new ArrayList<>(),
                 project.getFileCount(),
-                totalLines
+                (int) Math.min(Integer.MAX_VALUE, totalLines)
         );
         latestOpt.ifPresent(latest -> {
             List<Dimension> dims = latest.getDimensions() != null ? latest.getDimensions() : List.of();
@@ -255,7 +259,7 @@ public class ProjectController {
             Project project = projectOpt.get();
             // 1. 删除本地文件
             try {
-                Path base = Paths.get("uploads").resolve(id);
+                Path base = appProperties.projectDir(id);
                 if (Files.exists(base)) {
                     Files.walk(base)
                             .sorted(Comparator.reverseOrder())
@@ -319,21 +323,41 @@ public class ProjectController {
         if (!projectRepository.existsById(id)) {
             throw new ResourceNotFoundException("项目不存在");
         }
+        if (files == null || files.length == 0) {
+            throw new BadRequestException("未选择任何文件");
+        }
+
+        int existingCount = fileRepository.findByProjectId(id).size();
+        if (existingCount + files.length > MAX_FILES_PER_PROJECT) {
+            throw new BadRequestException(
+                    "单项目文件数不能超过 " + MAX_FILES_PER_PROJECT + "（当前已有 " + existingCount + "，本次上传 " + files.length + "）");
+        }
 
         List<ProjectFile> uploadedFiles = new ArrayList<>();
-        Path baseDir = Paths.get("uploads").resolve(id);
+        List<String> errors = new ArrayList<>();
+        Path baseDir = appProperties.projectDir(id);
         Files.createDirectories(baseDir);
         Instant uploadTime = Instant.now();
 
         for (MultipartFile file : files) {
-            String originalFilename = StringUtils.cleanPath(Objects.requireNonNull(file.getOriginalFilename()));
+            if (file == null || file.isEmpty()) {
+                errors.add("空文件已跳过");
+                continue;
+            }
+            String originalFilename = StringUtils.cleanPath(Objects.requireNonNullElse(file.getOriginalFilename(), ""));
+            if (originalFilename.isBlank() || originalFilename.contains("..")) {
+                errors.add("非法文件名已跳过");
+                continue;
+            }
+            if (!isAllowedExtension(originalFilename)) {
+                errors.add(originalFilename + ": 不支持的文件类型");
+                continue;
+            }
+
             String storedFilename = UUID.randomUUID() + "_" + originalFilename;
             Path targetPath = baseDir.resolve(storedFilename);
-
-            // 保存文件到本地
             Files.copy(file.getInputStream(), targetPath);
 
-            // 保存文件元数据到数据库
             ProjectFile projectFile = new ProjectFile();
             projectFile.setProjectId(id);
             projectFile.setFilename(originalFilename);
@@ -343,19 +367,23 @@ public class ProjectController {
             uploadedFiles.add(fileRepository.save(projectFile));
         }
 
-        // 更新项目文件数和更新时间
+        if (uploadedFiles.isEmpty()) {
+            throw new BadRequestException("没有成功上传任何文件"
+                    + (errors.isEmpty() ? "" : "：" + String.join("; ", errors)));
+        }
+
         projectRepository.findById(id).ifPresent(project -> {
             project.setFileCount(fileRepository.findByProjectId(id).size());
             project.setUpdatedAt(Instant.now());
             projectRepository.save(project);
         });
 
-        return Map.of(
-                "message", "成功上传 " + uploadedFiles.size() + " 个文件",
-                "uploadedFiles", uploadedFiles.stream().map(this::convertToMap).collect(Collectors.toList()),
-                "errors", List.of(),
-                "totalFiles", files.length
-        );
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("message", "成功上传 " + uploadedFiles.size() + " 个文件");
+        resp.put("uploadedFiles", uploadedFiles.stream().map(this::convertToMap).collect(Collectors.toList()));
+        resp.put("errors", errors);
+        resp.put("totalFiles", files.length);
+        return resp;
     }
 
     @DeleteMapping("/projects/{id}/files/{fileId}")
@@ -366,9 +394,8 @@ public class ProjectController {
             ProjectFile file = fileOpt.get();
             if (file.getProjectId().equals(id)) {
                 // 删除本地文件
-                String filePath = file.getFilePath();
-                String filename = Paths.get(filePath).getFileName().toString();
-                Path absPath = Paths.get("uploads").resolve(id).resolve(filename);
+                String filename = Paths.get(file.getFilePath()).getFileName().toString();
+                Path absPath = appProperties.resolveStoredFile(id, filename);
                 try { Files.deleteIfExists(absPath); } catch (IOException ignored) {}
 
                 // 删除数据库记录
@@ -404,9 +431,8 @@ public class ProjectController {
         Optional<ProjectFile> fileOpt = fileRepository.findByProjectIdAndFilePath(id, path);
         if (fileOpt.isPresent()) {
             ProjectFile file = fileOpt.get();
-            // 删除本地文件
             String filename = Paths.get(path).getFileName().toString();
-            Path absPath = Paths.get("uploads").resolve(id).resolve(filename);
+            Path absPath = appProperties.resolveStoredFile(id, filename);
             try { Files.deleteIfExists(absPath); } catch (IOException ignored) {}
 
             // 删除数据库记录
@@ -472,8 +498,9 @@ public class ProjectController {
 
             // 优化建议
             Map<String, Object> summary = new LinkedHashMap<>();
+            // 建议文案走 Translator，避免控制器硬编码中文
             summary.put("suggestions", analysis.getDimensions().stream()
-                    .map(d -> String.format("优化%s相关代码", d.getName()))
+                    .map(d -> report.translateSuggestion(d.getName()))
                     .collect(Collectors.toList()));
 
             List<Map<String, Object>> issuesOut = issues.stream().map(iss -> {
@@ -608,16 +635,11 @@ public class ProjectController {
     // -------------------------- 辅助接口 --------------------------
     @PostMapping("/projects/{id}/git")
     public Map<String, Object> importGit(@PathVariable String id, @RequestBody Map<String, Object> body) {
-        Optional<Project> projectOpt = projectRepository.findById(id);
-        if (projectOpt.isPresent()) {
-            Project project = projectOpt.get();
-            String repo = (String) body.getOrDefault("repo", "");
-            project.setUpdatedAt(Instant.now());
-            projectRepository.save(project);
-            return Map.of("message", "导入成功", "repo", repo, "taskId", UUID.randomUUID().toString());
-        } else {
+        if (!projectRepository.existsById(id)) {
             throw new ResourceNotFoundException("项目不存在");
         }
+        // Git 导入尚未实现（需 JGit clone）；明确返回 501，避免前端误以为已导入成功
+        throw new UnsupportedOperationException("Git 仓库导入功能尚未实现，请使用本地文件上传");
     }
 
     @GetMapping("/projects/stats")
@@ -654,8 +676,8 @@ public class ProjectController {
             Project savedProject = projectRepository.save(newProject);
 
             // 2. 复制项目文件元数据，并同步拷贝磁盘文件
-            Path sourceBase = Paths.get("uploads").resolve(id);
-            Path targetBase = Paths.get("uploads").resolve(savedProject.getId());
+            Path sourceBase = appProperties.projectDir(id);
+            Path targetBase = appProperties.projectDir(savedProject.getId());
             try {
                 Files.createDirectories(targetBase);
             } catch (IOException e) {
@@ -779,18 +801,53 @@ public class ProjectController {
         Optional<ProjectFile> byPath = fileRepository.findByProjectIdAndFilePath(projectId, path);
         if (byPath.isPresent()) {
             String stored = Paths.get(byPath.get().getFilePath()).getFileName().toString();
-            return Paths.get("uploads").resolve(projectId).resolve(stored);
+            return appProperties.resolveStoredFile(projectId, stored);
         }
-        // 兼容前端传相对路径或仅文件名
         String filename = Paths.get(path).getFileName().toString();
         List<ProjectFile> files = fileRepository.findByProjectId(projectId);
         for (ProjectFile pf : files) {
             String stored = Paths.get(pf.getFilePath()).getFileName().toString();
             if (stored.equals(filename) || pf.getFilename().equals(filename) || pf.getFilePath().equals(path)) {
-                return Paths.get("uploads").resolve(projectId).resolve(stored);
+                return appProperties.resolveStoredFile(projectId, stored);
             }
         }
-        return Paths.get("uploads").resolve(projectId).resolve(filename);
+        return appProperties.resolveStoredFile(projectId, filename);
+    }
+
+    /** 优先使用已持久化的文件行数，避免报告导出时重复读盘 */
+    private long resolveTotalLines(String projectId, Optional<Analysis> latestOpt) {
+        if (latestOpt.isPresent()) {
+            long sum = fileAnalysisResultRepository.sumLinesOfCodeByAnalysisId(latestOpt.get().getId());
+            if (sum > 0) {
+                return sum;
+            }
+        }
+        long total = 0;
+        for (ProjectFile pf : fileRepository.findByProjectId(projectId)) {
+            String storedName = Paths.get(pf.getFilePath()).getFileName().toString();
+            Path abs = appProperties.resolveStoredFile(projectId, storedName);
+            if (Files.exists(abs)) {
+                try {
+                    total += Files.lines(abs, StandardCharsets.UTF_8).count();
+                } catch (IOException ignored) {
+                }
+            }
+        }
+        return total;
+    }
+
+    private boolean isAllowedExtension(String filename) {
+        String lower = filename.toLowerCase(Locale.ROOT);
+        int dot = lower.lastIndexOf('.');
+        if (dot < 0) {
+            return false;
+        }
+        return ALLOWED_EXTENSIONS.contains(lower.substring(dot));
+    }
+
+    private String escapeHtml(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
     }
 
     // 实体转Map（适配原接口返回格式）

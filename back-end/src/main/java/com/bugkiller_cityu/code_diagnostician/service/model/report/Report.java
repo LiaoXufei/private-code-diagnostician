@@ -25,6 +25,15 @@ public class Report {
     @Autowired
     public Report(DefaultTranslator translator) {
         this.translator = translator;
+        // API 建议文案默认中文，与前端界面一致
+        if (translator instanceof DefaultTranslator dt) {
+            dt.setLanguage(Analyzer.Language.ZH_CN);
+        }
+    }
+
+    /** 按当前 Translator 语言生成维度优化建议 */
+    public String translateSuggestion(String dimensionName) {
+        return translator.translate("suggestion.optimize_dimension", dimensionName);
     }
 
     // 重要：报告选项，控制报告输出内容

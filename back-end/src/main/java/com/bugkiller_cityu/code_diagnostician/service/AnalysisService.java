@@ -1,5 +1,6 @@
 package com.bugkiller_cityu.code_diagnostician.service;
 
+import com.bugkiller_cityu.code_diagnostician.config.AppProperties;
 import com.bugkiller_cityu.code_diagnostician.entity.*;
 import com.bugkiller_cityu.code_diagnostician.exception.AnalysisFailedException;
 import com.bugkiller_cityu.code_diagnostician.exception.ResourceNotFoundException;
@@ -33,6 +34,7 @@ public class AnalysisService {
     private final AnalysisWebSocketHub webSocketHub;
     private final AnalysisAsyncLauncher asyncLauncher;
     private final TransactionTemplate transactionTemplate;
+    private final AppProperties appProperties;
 
     public AnalysisService(
             ProjectRepository projectRepository,
@@ -45,7 +47,8 @@ public class AnalysisService {
             AnalysisProgressTracker progressTracker,
             AnalysisWebSocketHub webSocketHub,
             AnalysisAsyncLauncher asyncLauncher,
-            PlatformTransactionManager transactionManager
+            PlatformTransactionManager transactionManager,
+            AppProperties appProperties
     ) {
         this.projectRepository = projectRepository;
         this.fileRepository = fileRepository;
@@ -58,6 +61,7 @@ public class AnalysisService {
         this.webSocketHub = webSocketHub;
         this.asyncLauncher = asyncLauncher;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.appProperties = appProperties;
     }
 
     /**
@@ -73,6 +77,11 @@ public class AnalysisService {
             throw new AnalysisFailedException("该项目已有分析任务正在进行");
         }
 
+        List<ProjectFile> existingFiles = fileRepository.findByProjectId(projectId);
+        if (existingFiles.isEmpty()) {
+            throw new AnalysisFailedException("项目中没有可分析的文件，请先上传源码");
+        }
+
         Analysis analysis = new Analysis();
         analysis.setProjectId(projectId);
         analysis.setOverallScore(0);
@@ -85,8 +94,7 @@ public class AnalysisService {
         projectRepository.save(project);
 
         AnalysisProgress progress = progressTracker.start(projectId, savedAnalysis.getId());
-        List<ProjectFile> files = fileRepository.findByProjectId(projectId);
-        progress.setTotalFiles(files.size());
+        progress.setTotalFiles(existingFiles.size());
         progress.setStage("queued");
         progress.setMessage("分析任务已排队");
 
@@ -168,8 +176,9 @@ public class AnalysisService {
             pushProgress(projectId, progressTracker.get(projectId).orElse(progress));
 
             String storedName = Paths.get(f.getFilePath()).getFileName().toString();
-            Path abs = Paths.get("uploads").resolve(projectId).resolve(storedName);
+            Path abs = appProperties.resolveStoredFile(projectId, storedName);
             if (!Files.exists(abs)) {
+                analysisErrors.add(f.getFilename() + ": 物理文件缺失");
                 processed++;
                 progressTracker.update(projectId, processed, files.size(), f.getFilename(), "analyzing",
                         "跳过缺失文件: " + f.getFilename());
@@ -198,7 +207,7 @@ public class AnalysisService {
                 far.setComplexity(complexity);
                 fileAnalysisResults.add(far);
             } catch (Exception e) {
-                e.printStackTrace();
+                System.err.println("[Analysis] 文件分析失败: " + f.getFilename() + " - " + e.getMessage());
                 analysisErrors.add(f.getFilename() + ": " + e.getMessage());
             }
 

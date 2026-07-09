@@ -1,11 +1,11 @@
-# 代码质量分析工具 - API 文档
+﻿# 代码质量分析工具 - API 文档
 
 ## 概述
 
 本文档描述了代码质量分析工具的完整 API 接口规范，包括后端数据库架构、数据传输方式和前后端响应逻辑。
 
 **基础信息：**
-- 基础 URL: `http://localhost:9998/api`
+- 基础 URL: `http://localhost:9999/api`
 - 数据格式: JSON
 - 字符编码: UTF-8
 - 认证方式: 当前无认证（后续扩展）
@@ -873,11 +873,11 @@ GET /api/analysis-types
 
 ```javascript
 // 获取项目列表
-const response = await axios.get('http://localhost:9998/api/projects');
+const response = await axios.get('http://localhost:9999/api/projects');
 const projects = response.data.data;
 
 // 创建新项目
-const newProject = await axios.post('http://localhost:9998/api/projects', {
+const newProject = await axios.post('http://localhost:9999/api/projects', {
   name: '我的新项目',
   description: '这是一个测试项目',
   language: 'javascript'
@@ -888,7 +888,7 @@ const formData = new FormData();
 formData.append('files', fileInput.files[0]);
 
 const uploadResponse = await axios.post(
-  `http://localhost:9998/api/projects/${projectId}/files`,
+  `http://localhost:9999/api/projects/${projectId}/files`,
   formData,
   {
     headers: {
@@ -899,7 +899,7 @@ const uploadResponse = await axios.post(
 
 // 启动分析
 const analysisResponse = await axios.post(
-  `http://localhost:9998/api/projects/${projectId}/analyze`,
+  `http://localhost:9999/api/projects/${projectId}/analyze`,
   {
     selectedFiles: ['file_123456'],
     config: {
@@ -914,10 +914,10 @@ const analysisResponse = await axios.post(
 
 ```bash
 # 获取项目列表
-curl -X GET http://localhost:9998/api/projects
+curl -X GET http://localhost:9999/api/projects
 
 # 创建新项目
-curl -X POST http://localhost:9998/api/projects \
+curl -X POST http://localhost:9999/api/projects \
   -H "Content-Type: application/json" \
   -d '{
     "name": "测试项目",
@@ -926,11 +926,11 @@ curl -X POST http://localhost:9998/api/projects \
   }'
 
 # 上传文件
-curl -X POST http://localhost:9998/api/projects/proj_123456/files \
+curl -X POST http://localhost:9999/api/projects/proj_123456/files \
   -F "files=@/path/to/file.js"
 
 # 启动分析
-curl -X POST http://localhost:9998/api/projects/proj_123456/analyze \
+curl -X POST http://localhost:9999/api/projects/proj_123456/analyze \
   -H "Content-Type: application/json" \
   -d '{
     "selectedFiles": ["file_123456"],
@@ -1002,14 +1002,14 @@ D:\Projects\代码审查Web开发\backend\
 **测试方法：**
 ```bash
 # 1. 上传测试文件
-curl -X POST http://localhost:9998/api/projects/{projectId}/files \
+curl -X POST http://localhost:9999/api/projects/{projectId}/files \
   -F "files=@test.js"
 
 # 2. 检查物理文件存在
 ls uploads/{projectId}/
 
 # 3. 删除文件
-curl -X DELETE http://localhost:9998/api/files/{fileId}
+curl -X DELETE http://localhost:9999/api/files/{fileId}
 
 # 4. 验证物理文件已删除
 ls uploads/{projectId}/  # 文件应不存在

@@ -199,15 +199,8 @@
           <a-card title="快速操作" class="actions-card">
             <div class="action-buttons">
               <a-space direction="vertical" style="width: 100%">
-                <a-button type="primary" block @click="goToOptimize">
-                  <BulbOutlined />
-                  查看优化建议
-                </a-button>
-<!--                <a-button block @click="exportReport('pdf')">-->
-<!--                  <FileTextOutlined />-->
-<!--                  导出PDF报告-->
-<!--                </a-button>-->
-                <a-button block @click="exportReport('md')">
+                <!-- AI 优化建议入口暂隐藏（功能为占位，避免误导） -->
+                <a-button type="primary" block @click="exportReport('md')">
                   <FileTextOutlined />
                   导出Markdown报告
                 </a-button>
@@ -239,6 +232,7 @@ import {
   RedoOutlined,
   BulbOutlined
 } from '@ant-design/icons-vue'
+// BulbOutlined 仍用于问题列表等展示，AI 优化跳转已移除
 import ScoreCard from '@/components/common/ScoreCard.vue'
 
 const route = useRoute()
@@ -446,28 +440,6 @@ const handleIssueClick = (issue) => {
 const handleFileClick = (file) => {
   console.log('点击文件:', file)
   message.info(`点击了文件: ${getFileName(file.file)}`)
-}
-
-const goToOptimize = () => {
-  console.log('🟢 Report.goToOptimize 被调用')
-  const projectId = route.params.id
-  console.log('🟢 项目ID:', projectId)
-
-  if (!projectId) {
-    message.error('项目ID不能为空')
-    return
-  }
-
-  console.log('🟢 即将跳转到:', `/project/${projectId}/optimize`)
-
-  try {
-    router.push(`/project/${projectId}/optimize`)
-    console.log('🟢 导航成功')
-    message.success('正在跳转到优化建议页面...')
-  } catch (error) {
-    console.error('🟢 导航失败:', error)
-    message.error('跳转失败，请重试')
-  }
 }
 
 const exportReport = (format) => {
