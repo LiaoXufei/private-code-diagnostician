@@ -27,4 +27,4 @@ spring:
 logging:
   level:
     org.springframework.data.jpa: INFO
-#    com.bugkiller_cityu: DEBUG
+#    com.diagnostician: DEBUG

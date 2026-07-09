@@ -38,9 +38,8 @@ npm run dev
 
 ```
 Code-Diagnostician/
-├── back-end/          # Spring Boot 后端
-│   ├── src/main/java/.../controller/
-│   ├── src/main/java/.../service/   # 异步分析、进度、WebSocket
+├── back-end/          # Spring Boot 后端（根包 `com.diagnostician`）
+│   ├── src/main/java/com/diagnostician/
 │   └── uploads/                     # 上传文件（可配置 app.upload-dir）
 ├── frontend/          # Vue3 前端
 ├── 杂项/              # API 文档、todolist 等
