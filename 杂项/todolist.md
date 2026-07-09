@@ -10,7 +10,7 @@
 
 ## 一、评分语义类（最高优先级）
 
-### 🔴 P0-1 评分与等级映射整体颠倒（致命Bug）
+### 🔴 P0-1 评分与等级映射整体颠倒（致命Bug）（已修复）
 - **位置**：`ProjectController.java:471-473`、`489`、`597`；`Report.java:55-67`
 - **现象**：`Analyzer.MetricResult.score` 注释明确为「0-1，**越高越差**」（`Analyzer.java:93`）；`Report` 的 `QUALITY_LEVELS` 也是「越高越差」（0=洁净→100=灾难）。但 `analyze()` 中：
   ```java
@@ -21,7 +21,7 @@
 - **影响**：前端展示的总分、等级、雷达图、问题列表全部语义错误；好代码显示低分"poor"，差代码显示高分"excellent"。
 - **建议**：统一为「0-100 质量分，越高越好」。在写入 DB 前做转换：`qualityScore = (1 - riskScore) * 100`；grade 阈值保持 `>=80 excellent / >=60 good / else poor`；维度同理。`Report` 侧将 `codeQualityScore` 也改为质量分并调整 `QUALITY_LEVELS` 语义，或在传入 Report 时再转回风险分（需两端对齐）。
 
-### 🔴 P0-2 PDF/MD 报告与 DB 评级不一致
+### 🔴 P0-2 PDF/MD 报告与 DB 评级不一致（已修复）
 - **位置**：`ProjectController.java:77-83`、`167-173`
 - **现象**：导出时 `new AnalysisResult(overall/100.0, ...)` 把 DB 中已颠倒的「质量分」又当回「风险分」传给 Report，导致 Report 输出的等级（按风险解读）与接口返回的 grade（按质量解读）相反。
 - **建议**：随 P0-1 一起统一语义，明确 Report 输入的是风险分还是质量分，全链路对齐。
@@ -30,17 +30,17 @@
 
 ## 二、性能与架构类
 
-### 🟠 P1-1 `GET /analysis` 每次请求重新分析全部文件
+### 🟠 P1-1 `GET /analysis` 每次请求重新分析全部文件（已修复）
 - **位置**：`ProjectController.java:587-609`
 - **现象**：每次拉取分析结果都对所有 `ProjectFile` 重新跑 `codeAnalyzer.analyzeFile()`。前端轮询 status 后会请求该接口，导致每次轮询都重复全量静态分析，CPU 飙升、响应慢，且 `fileResults.score` 与已存储的 `dimensions` 评分口径不一致。
 - **建议**：分析时把每个文件的 `linesOfCode/issues/complexity/score` 持久化（新增 `FileAnalysisResult` 实体或存入 Issue 的冗余字段）；`GET /analysis` 只读 DB。
 
-### 🟠 P1-2 分析同步阻塞，无真实进度
+### 🟠 P1-2 分析同步阻塞，无真实进度（已修复）
 - **位置**：`ProjectController.analyze()`（同步）、`getStatus()`（只返回 0/100）
 - **现象**：大项目分析会阻塞 HTTP 请求直至超时；`status` 接口 `progress` 仅 0 或 100；前端 `useWebSocket` 与轮询期望渐变进度，后端无 WebSocket 端点。
 - **建议**：改为异步（`@Async` + 线程池或 `TaskExecutor`），分析时写入进度到内存/DB/Redis；新增 `/ws` WebSocket 或 SSE 推送进度；或至少让 status 返回 `processed/total`。
 
-### 🟠 P1-3 列表接口 N+1 查询
+### 🟠 P1-3 列表接口 N+1 查询（已修复）
 - **位置**：`ProjectController.java:48-55` → `convertToMap`(`856-865`) 内 `analysisRepository.findById(lastAnalysisId)`
 - **现象**：每个项目额外查一次 Analysis，N+1。
 - **建议**：用 `@EntityGraph` 或批量 `findAllById` 预加载，或在 Project 中冗余 `lastScore/lastGrade/lastAnalysisAt` 字段。
@@ -59,7 +59,7 @@
 
 ## 三、数据一致性类
 
-### 🔴 P0-3 `DataInitializer` 维度名与实际指标不符
+### 🔴 P0-3 `DataInitializer` 维度名与实际指标不符（已修复）
 - **位置**：`DataInitializer.java:110-118`、`136-144`
 - **现象**：种子数据用「代码复杂度/可维护性/代码重复率/安全性/测试覆盖率/代码规范/性能」，实际 Metric 输出「圈复杂度分析/状态管理/注释覆盖率分析/代码重复度/结构分析/错误处理分析/命名规范」。其中**安全性/测试覆盖率/性能指标根本不存在**。一旦真实分析跑出来，维度名与示例完全对不上，前端雷达图维度会突变。
 - **建议**：种子数据维度名改为真实 7 个指标名；或补充对应 Metric；并保证示例项目评分语义与 P0-1 一致。
@@ -69,12 +69,12 @@
 - **现象**：示例项目在 CodeUpload/Analysis 页面打开会失败（文件不存在），`getFileContent` 返回假内容，无法重新分析。
 - **建议**：初始化时写入真实示例源码文件到 `uploads/{id}/`，或提供"示例项目不可分析"标识。
 
-### 🟠 P1-7 `duplicate` 不复制物理文件
+### 🟠 P1-7 `duplicate` 不复制物理文件（已修复）
 - **位置**：`ProjectController.java:783-794`
 - **现象**：仅复制文件元数据，`filePath.replace(id, newId)` 指向不存在的路径，副本项目无法分析/预览。
 - **建议**：复制时同步拷贝磁盘文件到新项目目录。
 
-### 🟡 P1-8 `getFileContent` 文件缺失返回假内容
+### 🟡 P1-8 `getFileContent` 文件缺失返回假内容（已修复）
 - **位置**：`ProjectController.java:311-313`
 - **现象**：返回 `"示例文件内容: " + filename`，前端误以为读到真实代码。
 - **建议**：文件不存在应抛 `ResourceNotFoundException`（404）；`Files.readString` 显式指定 `StandardCharsets.UTF_8`（Windows 默认 GBK 会乱码）。
@@ -83,12 +83,12 @@
 
 ## 四、接口契约与前后端对接类
 
-### 🟠 P1-9 前端调用不存在的后端端点
+### 🟠 P1-9 前端调用不存在的后端端点（已修复）
 - **位置**：`frontend/src/api/analysis.js:17` `reanalyze` → `POST /projects/{id}/reanalyze`
 - **现象**：后端无此端点，重新分析功能报 404。
 - **建议**：后端补 `/reanalyze`（等价于重新触发 analyze 并保留历史），或前端复用 `/analyze`。
 
-### 🟠 P1-10 错误返回 HTTP 200 + `{error:...}`
+### 🟠 P1-10 错误返回 HTTP 200 + `{error:...}`（已修复）
 - **位置**：`ProjectController` 所有错误分支、`GlobalExceptionHandler`
 - **现象**：已写好 `GlobalExceptionHandler`/`ResourceNotFoundException`/`ErrorResponse`，但 Controller 全部 `return Map.of("error", ...)`，状态码始终 200，前端难以统一拦截。
 - **建议**：Controller 改为抛 `ResourceNotFoundException` 等，由全局处理器返回正确 4xx/5xx；`request.js` 拦截器按状态码处理。
@@ -110,7 +110,7 @@
 
 ## 五、健壮性与安全类
 
-### 🟠 P1-14 `analyze()` 静默吞异常
+### 🟠 P1-14 `analyze()` 静默吞异常（已修复）
 - **位置**：`ProjectController.java:465-467`
 - **现象**：单文件分析失败仅 `printStackTrace` 后继续；若全部失败，`riskScore=0` → 评级随 P0-1 表现为"满分/最差"，用户无感知。
 - **建议**：收集错误写入日志/Issue；全部失败时返回明确错误而非伪结果。

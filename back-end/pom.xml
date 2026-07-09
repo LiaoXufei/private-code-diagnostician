@@ -31,6 +31,12 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- WebSocket：分析进度实时推送 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
         <!-- Spring Boot Web starter: 提供Web应用开发所需的核心功能 -->
         <!-- 包含Tomcat服务器、Spring MVC、RESTful服务支持等 -->
         <dependency>
