@@ -40,6 +40,10 @@
 - **位置**：`ProjectController.analyze()`（同步）、`getStatus()`（只返回 0/100）
 - **现象**：大项目分析会阻塞 HTTP 请求直至超时；`status` 接口 `progress` 仅 0 或 100；前端 `useWebSocket` 与轮询期望渐变进度，后端无 WebSocket 端点。
 - **建议**：改为异步（`@Async` + 线程池或 `TaskExecutor`），分析时写入进度到内存/DB/Redis；新增 `/ws` WebSocket 或 SSE 推送进度；或至少让 status 返回 `processed/total`。
+- **落实**：新增 `AnalysisService`/`AnalysisAsyncLauncher`（`@Async("analysisExecutor")`）/`AnalysisProgressTracker`（内存进度）/`AnalysisWebSocketHub`+`WebSocketConfig`（`/ws/analysis/{projectId}`）/`AsyncConfig`（线程池）。`analyze` 立即返回 taskId，事务提交后再启动异步任务；`status` 返回 `processed/total/progress/stage/message`；WebSocket 推送 `analysis_progress`/`analysis_completed`/`analysis_error`/`analysis_cancelled`。
+- **本次补修**：
+  - 修复取消竞态：`doAnalyze` 在持久化前后均校验 `cancelRequested`，避免取消信号在汇总/落库阶段到达后仍把项目写为 `completed`。
+  - 修复事件语义：取消场景由 `analysis_error` 改为独立的 `analysis_cancelled` 事件，前端不再把取消误判为失败；前端 `analysis.js` 新增 `analysis_cancelled` 订阅。
 
 ### 🟠 P1-3 列表接口 N+1 查询（已修复）
 - **位置**：`ProjectController.java:48-55` → `convertToMap`(`856-865`) 内 `analysisRepository.findById(lastAnalysisId)`

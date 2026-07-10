@@ -196,8 +196,9 @@ public class AnalysisService {
                 if (ccMr != null && ccMr.getIssues() != null) {
                     complexity = ccMr.getIssues().size();
                 }
+                // MetricResult.score / getOverallScore 均为质量分（0-1，越高越好）
                 int fileScore = (int) Math.round(
-                        (1.0 - codeAnalyzer.calculateOverallScore(List.of(r))) * 100.0);
+                        codeAnalyzer.calculateOverallScore(List.of(r)) * 100.0);
                 FileAnalysisResult far = new FileAnalysisResult();
                 far.setAnalysisId(savedAnalysis.getId());
                 far.setFilename(f.getFilename());
@@ -234,8 +235,9 @@ public class AnalysisService {
         progressTracker.update(projectId, processed, files.size(), "", "aggregating", "汇总分析结果");
         pushProgress(projectId, progressTracker.get(projectId).orElse(progress));
 
-        double riskScore = fileResults.isEmpty() ? 0.0 : codeAnalyzer.calculateOverallScore(fileResults);
-        int overallInt = fileResults.isEmpty() ? 0 : (int) Math.round((1.0 - riskScore) * 100.0);
+        // calculateOverallScore 返回质量分（0-1，越高越好），直接换算为 0-100 入库
+        double qualityScore = fileResults.isEmpty() ? 0.0 : codeAnalyzer.calculateOverallScore(fileResults);
+        int overallInt = fileResults.isEmpty() ? 0 : (int) Math.round(qualityScore * 100.0);
         String grade = overallInt >= 80 ? "excellent" : overallInt >= 60 ? "good" : "poor";
 
         Map<String, List<com.diagnostician.service.model.metric.MetricResult>> metricsMap =
@@ -251,12 +253,13 @@ public class AnalysisService {
         for (var entry : metricsMap.entrySet()) {
             String name = entry.getKey();
             List<com.diagnostician.service.model.metric.MetricResult> mrs = entry.getValue();
-            double avgRisk = mrs.stream()
+            // MetricResult.score 是质量分（越高越好）；无问题时约为 1.0 → 维度分约 100
+            double avgQuality = mrs.stream()
                     .mapToDouble(com.diagnostician.service.model.metric.MetricResult::getScore)
                     .average().orElse(0.0);
             int issuesCount = mrs.stream()
                     .mapToInt(m -> m.getIssues() == null ? 0 : m.getIssues().size()).sum();
-            int dimScore = (int) Math.round((1.0 - avgRisk) * 100.0);
+            int dimScore = (int) Math.round(avgQuality * 100.0);
             dimensions.add(createDimension(savedAnalysis.getId(), name, dimScore, 100, issuesCount));
         }
 
@@ -272,7 +275,19 @@ public class AnalysisService {
             }
         }
 
+        // 落库前再次校验取消标志：避免取消信号在汇总阶段到达后，仍把结果写为 completed
+        if (progress.isCancelRequested()) {
+            markCancelled(projectId, project);
+            return;
+        }
+
         persistAnalysisResult(projectId, analysisId, overallInt, grade, dimensions, fileAnalysisResults, allIssues);
+
+        // 落库后仍需校验：取消信号可能在持久化期间到达
+        if (progress.isCancelRequested()) {
+            markCancelled(projectId, project);
+            return;
+        }
 
         Project completedProject = projectRepository.findById(projectId).orElse(project);
         Analysis completedAnalysis = analysisRepository.findById(analysisId).orElse(savedAnalysis);
@@ -331,7 +346,7 @@ public class AnalysisService {
             p.setUpdatedAt(Instant.now());
             projectRepository.save(p);
         });
-        webSocketHub.send(projectId, "analysis_error", Map.of("error", "分析已取消"));
+        webSocketHub.send(projectId, "analysis_cancelled", Map.of("message", "分析已取消"));
     }
 
     public Map<String, Object> getStatus(String projectId) {
@@ -384,7 +399,7 @@ public class AnalysisService {
         project.setUpdatedAt(Instant.now());
         projectRepository.save(project);
 
-        webSocketHub.send(projectId, "analysis_error", Map.of("error", "分析已取消"));
+        webSocketHub.send(projectId, "analysis_cancelled", Map.of("message", "分析已取消"));
 
         return Map.of("message", "已取消分析", "projectId", projectId, "status", "cancelled");
     }

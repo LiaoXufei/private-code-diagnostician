@@ -190,6 +190,15 @@ export const useAnalysisStore = defineStore('analysis', () => {
         completeAnalysis(payload.result)
       })
 
+      // 订阅分析取消（与 error 区分，避免取消被误判为失败）
+      subscribe('analysis_cancelled', () => {
+        analysisStatus.value = 'cancelled'
+        analysisProgress.value = 0
+        cleanupWebSocket()
+        stopPolling()
+        message.info('分析任务已取消')
+      })
+
       // 订阅分析错误
       subscribe('analysis_error', (payload) => {
         analysisStatus.value = 'error'

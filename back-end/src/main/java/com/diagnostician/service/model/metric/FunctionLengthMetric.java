@@ -51,8 +51,9 @@ public class FunctionLengthMetric extends BaseMetric implements Metric{
     private ScoreAndIssues analyzeFunctions(JavaASTInfo astInfo, ParseResult parseResult) {
         List<Issue> issues = new ArrayList<>();
         List<Function> functions = parseResult.getFunctions();
+        // 无函数可分析时视为该维度满分，与其他 Metric「无内容给满分」一致
         if (functions.isEmpty()) {
-            return new ScoreAndIssues(0.0, issues);
+            return new ScoreAndIssues(1.0, issues);
         }
 
         int totalComplexity = 0;
