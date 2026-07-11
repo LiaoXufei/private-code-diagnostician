@@ -66,7 +66,12 @@ public class AiChatService {
                 .collect(Collectors.toList());
     }
 
-    public List<Map<String, Object>> listMessages(String conversationId) {
+    public List<Map<String, Object>> listMessages(String projectId, String conversationId) {
+        AiConversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("对话不存在"));
+        if (!projectId.equals(conversation.getProjectId())) {
+            throw new ResourceNotFoundException("对话不属于当前项目");
+        }
         return messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId).stream()
                 .map(m -> {
                     Map<String, Object> map = new LinkedHashMap<>();
@@ -200,8 +205,8 @@ public class AiChatService {
                 .replaceAll("^[\"'“”‘’《<]+", "")
                 .replaceAll("[\"'“”‘’》。.！!？?；;，,>]+$", "")
                 .trim();
-        if (title.length() > 30) {
-            title = title.substring(0, 30);
+        if (title.length() > 20) {
+            title = title.substring(0, 20);
         }
         return title.isBlank() ? null : title;
     }

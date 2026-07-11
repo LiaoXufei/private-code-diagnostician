@@ -82,13 +82,14 @@
               <a-textarea
                 v-model:value="inputText"
                 :rows="3"
+                :disabled="streaming"
                 placeholder="输入你的问题..."
                 @pressEnter="handleSend"
               />
               <a-button
                 type="primary"
                 :loading="streaming"
-                :disabled="!inputText.trim()"
+                :disabled="!inputText.trim() || streaming"
                 style="margin-top: 8px"
                 @click="handleSend"
               >
@@ -103,60 +104,58 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import { message } from 'ant-design-vue'
 import { MessageOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons-vue'
 import { useAiStore } from '@/stores/ai'
-import { aiApi } from '@/api/ai'
 
 const route = useRoute()
 const aiStore = useAiStore()
 const projectId = computed(() => route.params.id)
 
-const conversations = ref([])
-const messages = ref([])
-const currentConversationId = ref(null)
-const inputText = ref('')
-const convLoading = ref(false)
-const streaming = ref(false)
-const streamContent = ref('')
-const messagesRef = ref(null)
-const aiStatus = ref(null)
+const {
+  status: aiStatus,
+  conversations,
+  messages,
+  currentConversationId,
+  convLoading,
+  streaming,
+  streamContent
+} = storeToRefs(aiStore)
 
-async function loadConversations() {
-  convLoading.value = true
-  try {
-    const res = await aiApi.listConversations(projectId.value)
-    conversations.value = res.data || []
-  } finally {
-    convLoading.value = false
-  }
+const inputText = ref('')
+const messagesRef = ref(null)
+
+function scrollToBottom() {
+  nextTick(() => {
+    if (messagesRef.value) {
+      messagesRef.value.scrollTop = messagesRef.value.scrollHeight
+    }
+  })
 }
 
 async function handleNewChat() {
-  const res = await aiApi.createConversation(projectId.value, {})
-  currentConversationId.value = res.data.id
-  messages.value = []
-  await loadConversations()
+  try {
+    await aiStore.createConversation(projectId.value)
+  } catch {
+    message.error('创建对话失败')
+  }
 }
 
 async function selectConversation(id) {
-  currentConversationId.value = id
-  const res = await aiApi.listMessages(projectId.value, id)
-  messages.value = res.data || []
-  scrollToBottom()
+  try {
+    await aiStore.selectConversation(projectId.value, id)
+    scrollToBottom()
+  } catch {
+    message.error('加载对话失败')
+  }
 }
 
 async function handleDeleteConversation(id) {
   try {
-    await aiApi.deleteConversation(projectId.value, id)
-    if (id === currentConversationId.value) {
-      currentConversationId.value = null
-      messages.value = []
-    }
-    await loadConversations()
-    message.success('对话已删除')
+    await aiStore.deleteConversation(projectId.value, id)
   } catch {
     message.error('删除失败')
   }
@@ -167,71 +166,18 @@ async function handleSend(e) {
   e?.preventDefault?.()
 
   const text = inputText.value.trim()
-  if (!text) return
+  if (!text || streaming.value) return
 
-  if (!currentConversationId.value) {
-    await handleNewChat()
-  }
-
-  messages.value.push({
-    id: Date.now(),
-    role: 'user',
-    content: text
-  })
   inputText.value = ''
-  streaming.value = true
-  streamContent.value = ''
-  scrollToBottom()
-
-  try {
-    await new Promise((resolve, reject) => {
-      aiApi.streamChat(projectId.value, currentConversationId.value, text, {
-        onToken: (t) => {
-          streamContent.value += t
-          scrollToBottom()
-        },
-        onDone: resolve,
-        onError: reject
-      })
-    })
-    messages.value.push({
-      id: Date.now() + 1,
-      role: 'assistant',
-      content: streamContent.value
-    })
-    // AI 在后端异步根据首条提问生成对话标题，延迟刷新以展示新标题
-    setTimeout(loadConversations, 2000)
-  } catch (err) {
-    message.error('对话失败，请检查 AI 配置')
-  } finally {
-    streaming.value = false
-    streamContent.value = ''
-    scrollToBottom()
-  }
-}
-
-function scrollToBottom() {
-  nextTick(() => {
-    if (messagesRef.value) {
-      messagesRef.value.scrollTop = messagesRef.value.scrollHeight
-    }
-  })
+  await aiStore.handleSend(projectId.value, text, scrollToBottom)
 }
 
 onMounted(async () => {
-  try {
-    const res = await aiApi.getStatus()
-    aiStatus.value = res.data
-  } catch {}
-  await aiStore.fetchStatus()
-  await loadConversations()
-  if (aiStatus.value?.ragEnabled) {
-    try {
-      await aiApi.indexEmbeddings(projectId.value)
-    } catch {
-      // 索引可能失败（无 API Key），不阻断页面
-    }
-  }
+  await aiStore.initChatPage(projectId.value)
+})
+
+onUnmounted(() => {
+  aiStore.cleanupChatPage()
 })
 </script>
 

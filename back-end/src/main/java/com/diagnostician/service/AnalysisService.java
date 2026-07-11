@@ -302,6 +302,7 @@ public class AnalysisService {
                 projectId, completedProject, completedAnalysis, dimensions, allIssues);
         webSocketHub.send(projectId, "analysis_completed", Map.of("result", result));
         try {
+            embeddingService.clearIndexed(projectId);
             embeddingService.indexProject(projectId);
         } catch (Exception ignored) {
             // RAG 索引失败不影响主分析流程

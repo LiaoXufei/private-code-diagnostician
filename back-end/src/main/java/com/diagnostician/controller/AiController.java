@@ -123,7 +123,7 @@ public class AiController {
             @PathVariable String id,
             @PathVariable String conversationId
     ) {
-        return chatService.listMessages(conversationId);
+        return chatService.listMessages(id, conversationId);
     }
 
     @PostMapping(value = "/projects/{id}/ai/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

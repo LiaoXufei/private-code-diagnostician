@@ -6,6 +6,7 @@ import com.diagnostician.repository.*;
 import com.diagnostician.exception.BadRequestException;
 import com.diagnostician.exception.ResourceNotFoundException;
 import com.diagnostician.service.AnalysisService;
+import com.diagnostician.service.ai.EmbeddingService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -49,6 +50,7 @@ public class ProjectController {
     private final AnalysisRepository analysisRepository;
     private final FileAnalysisResultRepository fileAnalysisResultRepository;
     private final AnalysisService analysisService;
+    private final EmbeddingService embeddingService;
     private final Report report;
     private final AppProperties appProperties;
 
@@ -377,6 +379,8 @@ public class ProjectController {
             project.setUpdatedAt(Instant.now());
             projectRepository.save(project);
         });
+
+        embeddingService.clearIndexed(id);
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("message", "成功上传 " + uploadedFiles.size() + " 个文件");

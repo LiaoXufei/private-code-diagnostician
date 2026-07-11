@@ -67,28 +67,24 @@ const report = ref('')
 const toolTrace = ref([])
 
 async function runDiagnosis() {
+  if (running.value) return
   running.value = true
   report.value = ''
   toolTrace.value = ['Agent 启动，正在编排工具调用...']
 
   try {
-    await new Promise((resolve, reject) => {
-      aiApi.streamAgent(projectId.value, prompt.value, {
-        onToken: (t) => {
-          report.value += t
-          if (t.includes('分析') || t.includes('文件') || t.includes('问题')) {
-            toolTrace.value.push(`[推理] ${t.slice(0, 80)}...`)
-          }
-        },
-        onDone: () => {
-          toolTrace.value.push('[完成] 诊断报告已生成')
-          resolve()
-        },
-        onError: reject
-      })
+    const { done } = aiApi.streamAgent(projectId.value, prompt.value, {
+      onToken: (t) => {
+        report.value += t
+        if (t.includes('分析') || t.includes('文件') || t.includes('问题')) {
+          toolTrace.value.push(`[推理] ${t.slice(0, 80)}...`)
+        }
+      }
     })
+    await done
+    toolTrace.value.push('[完成] 诊断报告已生成')
   } catch (e) {
-    message.error('Agent 诊断失败，请检查 AI API 配置')
+    message.error('Agent 诊断失败: ' + (e.message || '请检查 AI API 配置'))
     toolTrace.value.push('[错误] ' + (e.message || '未知错误'))
   } finally {
     running.value = false

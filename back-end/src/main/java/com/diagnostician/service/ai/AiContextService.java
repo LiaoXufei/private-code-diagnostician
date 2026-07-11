@@ -7,6 +7,7 @@ import com.diagnostician.exception.ResourceNotFoundException;
 import com.diagnostician.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -31,7 +32,12 @@ public class AiContextService {
     }
 
     public Analysis requireLatestAnalysis(String projectId) {
-        return analysisRepository.findTopByProjectIdOrderByCreatedAtDesc(projectId)
+        Project project = requireProject(projectId);
+        String lastAnalysisId = project.getLastAnalysisId();
+        if (lastAnalysisId == null || lastAnalysisId.isBlank()) {
+            throw new ResourceNotFoundException("该项目暂无分析结果，请先完成代码分析");
+        }
+        return analysisRepository.findById(lastAnalysisId)
                 .orElseThrow(() -> new ResourceNotFoundException("该项目暂无分析结果，请先完成代码分析"));
     }
 
@@ -55,6 +61,7 @@ public class AiContextService {
         return fileRepository.findByProjectId(projectId);
     }
 
+    @Transactional(readOnly = true)
     public Map<String, Object> buildAnalysisSnapshot(String projectId) {
         Project project = requireProject(projectId);
         Analysis analysis = requireLatestAnalysis(projectId);
@@ -100,6 +107,10 @@ public class AiContextService {
             sb.append(String.format("%4d| %s%n", i + 1, lines[i]));
         }
         return sb.toString();
+    }
+
+    public Path resolveDiskPath(String projectId, String filePath) {
+        return resolveProjectFilePath(projectId, filePath);
     }
 
     private Path resolveProjectFilePath(String projectId, String path) {

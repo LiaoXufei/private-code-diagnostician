@@ -1,5 +1,6 @@
 package com.diagnostician.config;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.SimpleVectorStore;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -9,6 +10,7 @@ import org.springframework.context.annotation.Configuration;
 
 import java.io.File;
 
+@Slf4j
 @Configuration
 public class RagConfig {
 
@@ -29,8 +31,8 @@ public class RagConfig {
         if (persistFile.exists()) {
             try {
                 store.load(persistFile);
-            } catch (Exception ignored) {
-                // 持久化文件损坏时忽略，后续重新索引即可
+            } catch (Exception e) {
+                log.warn("向量库持久化文件加载失败，将重新索引: {}", e.getMessage());
             }
         }
         return store;

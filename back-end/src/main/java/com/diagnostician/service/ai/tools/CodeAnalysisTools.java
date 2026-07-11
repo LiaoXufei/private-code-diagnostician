@@ -4,6 +4,7 @@ import com.diagnostician.entity.Analysis;
 import com.diagnostician.entity.Issue;
 import com.diagnostician.entity.ProjectFile;
 import com.diagnostician.service.ai.AiContextService;
+import com.diagnostician.service.ai.util.SeverityUtils;
 import com.diagnostician.service.model.analyzer.Analyzer;
 import com.diagnostician.service.model.metric.AnalysisResult;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,8 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 
+import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -40,16 +43,24 @@ public class CodeAnalysisTools {
             @ToolParam(description = "项目ID") String projectId,
             @ToolParam(description = "文件路径或文件名") String filePath
     ) {
-        String content = contextService.readFileContent(projectId, filePath);
-        return content.length() > 8000 ? content.substring(0, 8000) + "\n...(truncated)" : content;
+        try {
+            String content = contextService.readFileContent(projectId, filePath);
+            return content.length() > 8000 ? content.substring(0, 8000) + "\n...(truncated)" : content;
+        } catch (Exception e) {
+            return "读取文件失败: " + e.getMessage();
+        }
     }
 
     @Tool(description = "获取项目最新的静态分析结果摘要")
     public String getAnalysisSummary(
             @ToolParam(description = "项目ID") String projectId
     ) {
-        Map<String, Object> snapshot = contextService.buildAnalysisSnapshot(projectId);
-        return snapshot.toString();
+        try {
+            Map<String, Object> snapshot = contextService.buildAnalysisSnapshot(projectId);
+            return snapshot.toString();
+        } catch (Exception e) {
+            return "获取分析摘要失败: " + e.getMessage();
+        }
     }
 
     @Tool(description = "对项目中指定文件运行静态分析并返回评分和问题数")
@@ -63,11 +74,18 @@ public class CodeAnalysisTools {
                     .findFirst()
                     .orElseThrow(() -> new RuntimeException("文件不存在: " + filePath));
 
-            AnalysisResult result = codeAnalyzer.analyzeFile(target.getFilePath());
+            Path diskPath = contextService.resolveDiskPath(projectId, target.getFilename());
+            if (diskPath == null) {
+                return "分析失败: 无法解析文件磁盘路径: " + filePath;
+            }
+
+            AnalysisResult result = codeAnalyzer.analyzeFile(diskPath.toString());
             double score = result.getOverallScore() * 100;
             int issueCount = result.getIssues() != null ? result.getIssues().size() : 0;
             return String.format("文件 %s 分析完成：评分 %.1f，问题数 %d", filePath, score, issueCount);
         } catch (Analyzer.AnalysisException e) {
+            return "分析失败: " + e.getMessage();
+        } catch (Exception e) {
             return "分析失败: " + e.getMessage();
         }
     }
@@ -79,15 +97,9 @@ public class CodeAnalysisTools {
         Analysis analysis = contextService.requireLatestAnalysis(projectId);
         List<Issue> issues = contextService.getIssuesForAnalysis(analysis.getId());
         return issues.stream()
-                .sorted((a, b) -> severityRank(a.getSeverity()) - severityRank(b.getSeverity()))
+                .sorted(Comparator.comparingInt(i -> SeverityUtils.severityRank(i.getSeverity())))
                 .limit(10)
                 .map(i -> String.format("[%s] %s:%s - %s", i.getSeverity(), i.getFile(), i.getLine(), i.getMessage()))
                 .collect(Collectors.joining("\n"));
-    }
-
-    private int severityRank(String severity) {
-        if ("high".equalsIgnoreCase(severity)) return 0;
-        if ("medium".equalsIgnoreCase(severity)) return 1;
-        return 2;
     }
 }

@@ -31,7 +31,7 @@
         <a-col :span="10">
           <a-card title="分析问题" class="issues-panel">
             <template #extra>
-              <a-button size="small" :loading="summaryLoading" @click="generateSummary">
+              <a-button size="small" :loading="summaryLoading" :disabled="aiStreaming && !summaryLoading" @click="generateSummary">
                 生成摘要
               </a-button>
             </template>
@@ -64,7 +64,7 @@
                 <a-button
                   type="primary"
                   size="small"
-                  :disabled="!selectedIssue"
+                  :disabled="!selectedIssue || (aiStreaming && !optimizeLoading)"
                   :loading="optimizeLoading"
                   @click="generateOptimize"
                 >
@@ -72,7 +72,7 @@
                 </a-button>
                 <a-button
                   size="small"
-                  :disabled="!selectedIssue"
+                  :disabled="!selectedIssue || (aiStreaming && !fixLoading)"
                   :loading="fixLoading"
                   @click="generateFix"
                 >
@@ -134,8 +134,20 @@ const aiStatus = ref(null)
 const apiKeyMissing = ref(false)
 const apiKeyHint = ref('')
 
+const aiStreaming = computed(() => summaryLoading.value || optimizeLoading.value || fixLoading.value)
+
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 const renderedContent = computed(() => {
-  return aiContent.value
+  const escaped = escapeHtml(aiContent.value)
+  return escaped
     .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
     .replace(/\n/g, '<br>')
 })
@@ -164,16 +176,14 @@ function selectIssue(issue) {
 }
 
 async function generateSummary() {
+  if (aiStreaming.value) return
   summaryLoading.value = true
   aiContent.value = ''
   try {
-    await new Promise((resolve, reject) => {
-      aiApi.streamSummary(projectId.value, {
-        onToken: (t) => { aiContent.value += t },
-        onDone: resolve,
-        onError: reject
-      })
+    const { done } = aiApi.streamSummary(projectId.value, {
+      onToken: (t) => { aiContent.value += t }
     })
+    await done
   } catch (e) {
     message.error('生成摘要失败: ' + (e.message || '请检查 AI 配置'))
   } finally {
@@ -182,37 +192,31 @@ async function generateSummary() {
 }
 
 async function generateOptimize() {
-  if (!selectedIssue.value) return
+  if (!selectedIssue.value || aiStreaming.value) return
   optimizeLoading.value = true
   aiContent.value = ''
   showDiff.value = false
   try {
-    await new Promise((resolve, reject) => {
-      aiApi.streamOptimize(projectId.value, selectedIssue.value.id, {
-        onToken: (t) => { aiContent.value += t },
-        onDone: resolve,
-        onError: reject
-      })
+    const { done } = aiApi.streamOptimize(projectId.value, selectedIssue.value.id, {
+      onToken: (t) => { aiContent.value += t }
     })
+    await done
   } catch (e) {
-    message.error('生成优化建议失败')
+    message.error('生成优化建议失败: ' + (e.message || '请检查 AI 配置'))
   } finally {
     optimizeLoading.value = false
   }
 }
 
 async function generateFix() {
-  if (!selectedIssue.value) return
+  if (!selectedIssue.value || aiStreaming.value) return
   fixLoading.value = true
   aiContent.value = ''
   try {
-    await new Promise((resolve, reject) => {
-      aiApi.streamFix(projectId.value, selectedIssue.value.id, {
-        onToken: (t) => { aiContent.value += t },
-        onDone: resolve,
-        onError: reject
-      })
+    const { done } = aiApi.streamFix(projectId.value, selectedIssue.value.id, {
+      onToken: (t) => { aiContent.value += t }
     })
+    await done
     await loadCodeForDiff()
   } catch (e) {
     message.error('生成修复代码失败: ' + (e.message || '请检查 AI 配置'))

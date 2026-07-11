@@ -3,6 +3,7 @@ package com.diagnostician.service.ai;
 import com.diagnostician.config.AiProperties;
 import com.diagnostician.entity.Analysis;
 import com.diagnostician.entity.Issue;
+import com.diagnostician.service.ai.util.SeverityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
@@ -85,7 +86,7 @@ public class AiOptimizeService {
     public Flux<String> streamBatchOptimize(String projectId) {
         Analysis analysis = contextService.requireLatestAnalysis(projectId);
         List<Issue> issues = contextService.getIssuesForAnalysis(analysis.getId()).stream()
-                .sorted(Comparator.comparingInt(i -> severityRank(i.getSeverity())))
+                .sorted(Comparator.comparingInt(i -> SeverityUtils.severityRank(i.getSeverity())))
                 .limit(aiProperties.getMaxContextIssues())
                 .collect(Collectors.toList());
 
@@ -135,11 +136,5 @@ public class AiOptimizeService {
                 ```
                 """.formatted(target.getMessage(), target.getFile(), target.getLine(), codeContext);
         return chatClient.prompt().user(prompt).stream().content();
-    }
-
-    private int severityRank(String severity) {
-        if ("high".equalsIgnoreCase(severity)) return 0;
-        if ("medium".equalsIgnoreCase(severity)) return 1;
-        return 2;
     }
 }

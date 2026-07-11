@@ -141,8 +141,22 @@ request.interceptors.response.use(
 )
 
 // 生成请求ID
-function generateRequestId() {
+export function generateRequestId() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2)
+}
+
+/** 构建与 axios 拦截器一致的鉴权请求头，供 fetch/SSE 复用 */
+export function buildAuthHeaders(extra = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...extra
+  }
+  const token = localStorage.getItem('token')
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+  headers['X-Request-ID'] = generateRequestId()
+  return headers
 }
 
 // 请求方法封装
