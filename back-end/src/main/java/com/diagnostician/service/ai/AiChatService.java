@@ -6,6 +6,7 @@ import com.diagnostician.exception.ResourceNotFoundException;
 import com.diagnostician.repository.AiConversationRepository;
 import com.diagnostician.repository.AiMessageRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Service;
@@ -18,13 +19,16 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AiChatService {
 
     private static final String DEFAULT_TITLE = "新对话";
+    private static final int MAX_HISTORY_MESSAGES = 10;
 
     private final ChatClient chatClient;
+    private final ChatClient statelessChatClient;
     private final EmbeddingService embeddingService;
     private final AiContextService contextService;
     private final AiConversationRepository conversationRepository;
@@ -97,13 +101,11 @@ public class AiChatService {
 
         saveMessage(conversationId, "user", userMessage, null);
 
-        // RAG 检索：如果 embedding 可用则检索代码片段，否则降级为无检索对话
+        // RAG 检索：异步触发索引（不阻塞首 token），降级模式用文件列表
         String context;
         String references;
         if (embeddingService.isRagEnabled()) {
-            if (!embeddingService.isIndexed(projectId)) {
-                embeddingService.indexProject(projectId);
-            }
+            ensureIndexedAsync(projectId);
             List<Document> docs = embeddingService.search(projectId, userMessage, 5);
             context = docs.stream()
                     .map(Document::getText)
@@ -113,12 +115,14 @@ public class AiChatService {
                     .distinct()
                     .collect(Collectors.joining(", "));
         } else {
-            // 降级模式：把项目文件列表作为上下文
             var files = contextService.listFiles(projectId);
             context = "项目文件列表（未启用 RAG，无法检索代码片段）：\n" +
                     files.stream().map(f -> "- " + f.getFilename()).collect(Collectors.joining("\n"));
             references = "";
         }
+
+        // 注入最近历史消息，使模型具备多轮对话上下文
+        String history = buildRecentHistory(conversationId);
 
         String prompt = """
                 你是代码库问答助手。请基于以下上下文回答用户问题。
@@ -130,12 +134,17 @@ public class AiChatService {
                 上下文：
                 %s
 
-                用户问题：%s
-                """.formatted(context.isBlank() ? "（无可用上下文）" : context, userMessage);
+                %s用户问题：%s
+                """.formatted(
+                context.isBlank() ? "（无可用上下文）" : context,
+                history,
+                userMessage
+        );
 
         StringBuilder buffer = new StringBuilder();
         return chatClient.prompt()
                 .user(prompt)
+                .advisors(a -> a.param("conversation_id", conversationId))
                 .stream()
                 .content()
                 .doOnNext(buffer::append)
@@ -150,7 +159,55 @@ public class AiChatService {
                     if (needsAutoTitle) {
                         scheduleAutoTitle(conversation, userMessage);
                     }
+                })
+                .doOnError(err -> {
+                    log.warn("流式对话失败: conversationId={} - {}", conversationId, err.getMessage());
+                    String partial = buffer.toString();
+                    if (!partial.isBlank()) {
+                        saveMessage(conversationId, "assistant", partial + "\n\n[流式响应中断]", references);
+                    }
                 });
+    }
+
+    /**
+     * 异步触发索引，不阻塞 SSE 首 token。索引未完成时本次检索可能为空，
+     * 下次提问时索引已就绪即可命中。
+     */
+    private void ensureIndexedAsync(String projectId) {
+        if (!embeddingService.isIndexed(projectId)) {
+            Mono.fromRunnable(() -> {
+                try {
+                    embeddingService.indexProject(projectId);
+                } catch (Exception e) {
+                    log.warn("异步索引失败: projectId={} - {}", projectId, e.getMessage());
+                }
+            }).subscribeOn(Schedulers.boundedElastic()).subscribe();
+        }
+    }
+
+    /**
+     * 构建最近 N 条历史消息文本，注入 prompt 供多轮对话。
+     */
+    private String buildRecentHistory(String conversationId) {
+        List<AiMessage> all = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
+        if (all.size() <= 1) {
+            return "";
+        }
+        // 排除刚存入的当前用户消息（最后一条）
+        int total = all.size();
+        int start = Math.max(0, total - 1 - MAX_HISTORY_MESSAGES);
+        StringBuilder sb = new StringBuilder("历史对话：\n");
+        for (int i = start; i < total - 1; i++) {
+            AiMessage m = all.get(i);
+            String role = "user".equals(m.getRole()) ? "用户" : "助手";
+            String content = m.getContent();
+            if (content != null && content.length() > 500) {
+                content = content.substring(0, 500) + "...";
+            }
+            sb.append(role).append(": ").append(content).append("\n");
+        }
+        sb.append("\n");
+        return sb.toString();
     }
 
     private void saveMessage(String conversationId, String role, String content, String references) {
@@ -175,15 +232,17 @@ public class AiChatService {
                     conversation.setTitle(newTitle);
                     conversation.setUpdatedAt(Instant.now());
                     conversationRepository.save(conversation);
+                    log.info("自动生成对话标题: {} -> {}", conversation.getId(), newTitle);
                 }
-            } catch (Exception ignored) {
-                // 标题生成失败，保留默认标题
+            } catch (Exception e) {
+                log.warn("生成对话标题失败: {}", e.getMessage());
             }
         }).subscribeOn(Schedulers.boundedElastic()).subscribe();
     }
 
     /**
      * 调用 AI 根据用户首条提问生成简洁的对话标题，并做清洗与长度截断。
+     * 使用无状态 ChatClient 避免污染会话记忆。
      */
     private String generateTitle(String userMessage) {
         String prompt = """
@@ -196,7 +255,7 @@ public class AiChatService {
 
                 用户提问：%s
                 """.formatted(userMessage);
-        String title = chatClient.prompt().user(prompt).call().content();
+        String title = statelessChatClient.prompt().user(prompt).call().content();
         if (title == null) {
             return null;
         }

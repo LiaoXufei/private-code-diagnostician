@@ -86,7 +86,7 @@ public class EmbeddingService {
             for (ProjectFile file : files) {
                 String content;
                 try {
-                    content = contextService.readFileContent(projectId, file.getFilename());
+                    content = contextService.readFileContent(projectId, file.getFilename(), files);
                 } catch (Exception e) {
                     log.warn("读取文件失败: {} - {}", file.getFilename(), e.getMessage());
                     readFail++;

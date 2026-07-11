@@ -5,6 +5,7 @@ import com.diagnostician.entity.Analysis;
 import com.diagnostician.entity.Issue;
 import com.diagnostician.service.ai.util.SeverityUtils;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -14,11 +15,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AiOptimizeService {
 
-    private final ChatClient chatClient;
+    private final ChatClient statelessChatClient;
     private final AiContextService contextService;
     private final AiProperties aiProperties;
 
@@ -33,7 +35,7 @@ public class AiOptimizeService {
                 分析数据：
                 %s
                 """.formatted(snapshot);
-        return chatClient.prompt().user(prompt).stream().content();
+        return statelessChatClient.prompt().user(prompt).stream().content();
     }
 
     public Flux<String> streamOptimize(String projectId, String issueId) {
@@ -48,7 +50,8 @@ public class AiOptimizeService {
         try {
             String content = contextService.readFileContent(projectId, target.getFile());
             codeContext = contextService.extractCodeContext(content, target.getLine() != null ? target.getLine() : 1, 12);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.warn("读取源码上下文失败: {} - {}", target.getFile(), e.getMessage());
             codeContext = "（无法读取源码上下文）";
         }
 
@@ -80,7 +83,7 @@ public class AiOptimizeService {
                 target.getSuggestion(),
                 codeContext
         );
-        return chatClient.prompt().user(prompt).stream().content();
+        return statelessChatClient.prompt().user(prompt).stream().content();
     }
 
     public Flux<String> streamBatchOptimize(String projectId) {
@@ -103,7 +106,7 @@ public class AiOptimizeService {
                 问题列表：
                 %s
                 """.formatted(issueList);
-        return chatClient.prompt().user(prompt).stream().content();
+        return statelessChatClient.prompt().user(prompt).stream().content();
     }
 
     public Flux<String> streamFixCode(String projectId, String issueId) {
@@ -135,6 +138,6 @@ public class AiOptimizeService {
                 %s
                 ```
                 """.formatted(target.getMessage(), target.getFile(), target.getLine(), codeContext);
-        return chatClient.prompt().user(prompt).stream().content();
+        return statelessChatClient.prompt().user(prompt).stream().content();
     }
 }

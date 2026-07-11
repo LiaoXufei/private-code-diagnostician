@@ -5,9 +5,11 @@ import com.diagnostician.entity.AiConversation;
 import com.diagnostician.exception.AiServiceException;
 import com.diagnostician.service.ai.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.Disposable;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
@@ -16,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
+@Slf4j
 @CrossOrigin
 @RestController
 @RequestMapping("/api")
@@ -152,7 +155,20 @@ public class AiController {
         ensureAiEnabled();
         aiRequestCounter.incrementAndGet();
         SseEmitter emitter = new SseEmitter(300_000L);
-        flux.publishOn(Schedulers.boundedElastic())
+        Disposable[] disposableHolder = new Disposable[1];
+        Runnable cancel = () -> {
+            if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
+                disposableHolder[0].dispose();
+            }
+        };
+        emitter.onTimeout(cancel);
+        emitter.onCompletion(cancel);
+        emitter.onError(t -> {
+            log.warn("SSE emitter error: {}", t.getMessage());
+            cancel.run();
+        });
+
+        disposableHolder[0] = flux.publishOn(Schedulers.boundedElastic())
                 .subscribe(
                         token -> {
                             try {
@@ -162,10 +178,9 @@ public class AiController {
                             }
                         },
                         error -> {
-                            // 把错误信息作为最后一个 SSE 事件发给前端，再关闭
+                            log.warn("AI 流式响应失败: {}", error.getMessage());
                             try {
-                                String errMsg = error.getMessage() != null ? error.getMessage() : error.getClass().getSimpleName();
-                                emitter.send(SseEmitter.event().name("error").data("[AI_ERROR] " + errMsg));
+                                emitter.send(SseEmitter.event().name("error").data("[AI_ERROR] AI 服务暂时不可用，请稍后重试"));
                             } catch (IOException ignored) {
                             }
                             emitter.completeWithError(error);

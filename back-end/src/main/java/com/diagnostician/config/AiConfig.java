@@ -71,10 +71,24 @@ public class AiConfig {
                 .defaultAdvisors(new SimpleLoggerAdvisor());
     }
 
+    /**
+     * 带会话记忆的 ChatClient，仅用于 AI 代码对话（按 conversationId 隔离）。
+     */
     @Bean
     public ChatClient chatClient(ChatClient.Builder builder, MessageWindowChatMemory chatMemory) {
         return builder
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .build();
+    }
+
+    /**
+     * 无状态 ChatClient，用于单次 prompt 场景（优化建议、标题生成等），
+     * 避免污染全局会话记忆。
+     */
+    @Bean
+    public ChatClient statelessChatClient(ChatModel chatModel) {
+        return ChatClient.builder(chatModel)
+                .defaultAdvisors(new SimpleLoggerAdvisor())
                 .build();
     }
 }

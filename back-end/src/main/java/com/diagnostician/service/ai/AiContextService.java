@@ -46,7 +46,14 @@ public class AiContextService {
     }
 
     public String readFileContent(String projectId, String filePath) {
-        Path absPath = resolveProjectFilePath(projectId, filePath);
+        return readFileContent(projectId, filePath, null);
+    }
+
+    /**
+     * 读取文件内容。可传入预加载的文件列表避免循环内重复查库（索引场景）。
+     */
+    public String readFileContent(String projectId, String filePath, List<ProjectFile> preloadedFiles) {
+        Path absPath = resolveProjectFilePath(projectId, filePath, preloadedFiles);
         if (absPath == null || !Files.exists(absPath)) {
             throw new ResourceNotFoundException("文件不存在: " + filePath);
         }
@@ -110,14 +117,14 @@ public class AiContextService {
     }
 
     public Path resolveDiskPath(String projectId, String filePath) {
-        return resolveProjectFilePath(projectId, filePath);
+        return resolveProjectFilePath(projectId, filePath, null);
     }
 
-    private Path resolveProjectFilePath(String projectId, String path) {
+    private Path resolveProjectFilePath(String projectId, String path, List<ProjectFile> preloadedFiles) {
         if (path == null || path.isBlank()) {
             return null;
         }
-        List<ProjectFile> files = fileRepository.findByProjectId(projectId);
+        List<ProjectFile> files = preloadedFiles != null ? preloadedFiles : fileRepository.findByProjectId(projectId);
         // 1. 精确匹配 filename 或 filePath
         for (ProjectFile pf : files) {
             if (path.equals(pf.getFilename()) || path.equals(pf.getFilePath())) {

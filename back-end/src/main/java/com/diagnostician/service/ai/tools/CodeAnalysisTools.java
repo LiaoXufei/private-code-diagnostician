@@ -29,13 +29,17 @@ public class CodeAnalysisTools {
     public String listProjectFiles(
             @ToolParam(description = "项目ID") String projectId
     ) {
-        List<ProjectFile> files = contextService.listFiles(projectId);
-        if (files.isEmpty()) {
-            return "项目暂无文件";
+        try {
+            List<ProjectFile> files = contextService.listFiles(projectId);
+            if (files.isEmpty()) {
+                return "项目暂无文件";
+            }
+            return files.stream()
+                    .map(f -> "- " + f.getFilename() + " (" + f.getFileSize() + " bytes)")
+                    .collect(Collectors.joining("\n"));
+        } catch (Exception e) {
+            return "列出文件失败: " + e.getMessage();
         }
-        return files.stream()
-                .map(f -> "- " + f.getFilename() + " (" + f.getFileSize() + " bytes)")
-                .collect(Collectors.joining("\n"));
     }
 
     @Tool(description = "读取项目中指定文件的内容（最多返回前8000字符）")
@@ -94,12 +98,16 @@ public class CodeAnalysisTools {
     public String listTopIssues(
             @ToolParam(description = "项目ID") String projectId
     ) {
-        Analysis analysis = contextService.requireLatestAnalysis(projectId);
-        List<Issue> issues = contextService.getIssuesForAnalysis(analysis.getId());
-        return issues.stream()
-                .sorted(Comparator.comparingInt(i -> SeverityUtils.severityRank(i.getSeverity())))
-                .limit(10)
-                .map(i -> String.format("[%s] %s:%s - %s", i.getSeverity(), i.getFile(), i.getLine(), i.getMessage()))
-                .collect(Collectors.joining("\n"));
+        try {
+            Analysis analysis = contextService.requireLatestAnalysis(projectId);
+            List<Issue> issues = contextService.getIssuesForAnalysis(analysis.getId());
+            return issues.stream()
+                    .sorted(Comparator.comparingInt(i -> SeverityUtils.severityRank(i.getSeverity())))
+                    .limit(10)
+                    .map(i -> String.format("[%s] %s:%s - %s", i.getSeverity(), i.getFile(), i.getLine(), i.getMessage()))
+                    .collect(Collectors.joining("\n"));
+        } catch (Exception e) {
+            return "获取问题清单失败: " + e.getMessage();
+        }
     }
 }
