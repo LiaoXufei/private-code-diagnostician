@@ -11,6 +11,14 @@
     </div>
 
     <div class="content-container">
+      <a-alert
+        v-if="aiStatus && !aiStatus.ragEnabled"
+        type="info"
+        show-icon
+        :message="`RAG 未启用（embedding-provider=${aiStatus.embeddingProvider}），对话为降级模式`"
+        :description="aiStatus.hint || '如需代码语义检索，请配置 EMBEDDING_PROVIDER=openai 或 ollama'"
+        style="margin-bottom: 16px"
+      />
       <a-row :gutter="16">
         <a-col :span="6">
           <a-card title="对话列表" size="small">
@@ -28,7 +36,23 @@
                   :class="{ active: item.id === currentConversationId }"
                   @click="selectConversation(item.id)"
                 >
-                  {{ item.title }}
+                  <span class="conv-title">{{ item.title }}</span>
+                  <a-popconfirm
+                    title="确定删除该对话？"
+                    ok-text="删除"
+                    cancel-text="取消"
+                    @confirm="handleDeleteConversation(item.id)"
+                  >
+                    <a-button
+                      type="text"
+                      size="small"
+                      class="conv-delete-btn"
+                      aria-label="删除对话"
+                      @click.stop
+                    >
+                      <DeleteOutlined />
+                    </a-button>
+                  </a-popconfirm>
                 </a-list-item>
               </template>
             </a-list>
@@ -82,7 +106,7 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { MessageOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { MessageOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons-vue'
 import { useAiStore } from '@/stores/ai'
 import { aiApi } from '@/api/ai'
 
@@ -98,6 +122,7 @@ const convLoading = ref(false)
 const streaming = ref(false)
 const streamContent = ref('')
 const messagesRef = ref(null)
+const aiStatus = ref(null)
 
 async function loadConversations() {
   convLoading.value = true
@@ -110,7 +135,7 @@ async function loadConversations() {
 }
 
 async function handleNewChat() {
-  const res = await aiApi.createConversation(projectId.value, { title: '新对话 ' + new Date().toLocaleTimeString() })
+  const res = await aiApi.createConversation(projectId.value, {})
   currentConversationId.value = res.data.id
   messages.value = []
   await loadConversations()
@@ -121,6 +146,20 @@ async function selectConversation(id) {
   const res = await aiApi.listMessages(projectId.value, id)
   messages.value = res.data || []
   scrollToBottom()
+}
+
+async function handleDeleteConversation(id) {
+  try {
+    await aiApi.deleteConversation(projectId.value, id)
+    if (id === currentConversationId.value) {
+      currentConversationId.value = null
+      messages.value = []
+    }
+    await loadConversations()
+    message.success('对话已删除')
+  } catch {
+    message.error('删除失败')
+  }
 }
 
 async function handleSend(e) {
@@ -160,6 +199,8 @@ async function handleSend(e) {
       role: 'assistant',
       content: streamContent.value
     })
+    // AI 在后端异步根据首条提问生成对话标题，延迟刷新以展示新标题
+    setTimeout(loadConversations, 2000)
   } catch (err) {
     message.error('对话失败，请检查 AI 配置')
   } finally {
@@ -178,12 +219,18 @@ function scrollToBottom() {
 }
 
 onMounted(async () => {
+  try {
+    const res = await aiApi.getStatus()
+    aiStatus.value = res.data
+  } catch {}
   await aiStore.fetchStatus()
   await loadConversations()
-  try {
-    await aiApi.indexEmbeddings(projectId.value)
-  } catch {
-    // 索引可能失败（无 API Key），不阻断页面
+  if (aiStatus.value?.ragEnabled) {
+    try {
+      await aiApi.indexEmbeddings(projectId.value)
+    } catch {
+      // 索引可能失败（无 API Key），不阻断页面
+    }
   }
 })
 </script>
@@ -255,10 +302,36 @@ onMounted(async () => {
   cursor: pointer;
   padding: 8px;
   border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .conv-item.active {
   background: #e6f7ff;
+}
+
+.conv-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conv-delete-btn {
+  flex-shrink: 0;
+  opacity: 0;
+  color: #999;
+  transition: opacity 0.2s;
+}
+
+.conv-item:hover .conv-delete-btn {
+  opacity: 1;
+}
+
+.conv-delete-btn:hover {
+  color: #ff4d4f;
 }
 
 .empty-chat {

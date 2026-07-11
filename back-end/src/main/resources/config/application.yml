@@ -6,8 +6,18 @@ app:
   upload-dir: uploads
   ai:
     enabled: true
-    # 可选: openai | deepseek | qwen | ollama
+    # Chat 模型提供商: openai | deepseek | qwen | ollama
     active-provider: ${AI_PROVIDER:deepseek}
+    # Embedding 模型提供商: openrouter | openai | ollama | none
+    # 注意：DeepSeek 不提供 Embedding API，RAG 功能需要单独的 Embedding 来源
+    # - openrouter: 用 OpenRouter 提供 Embedding（可使用免费模型，需单独的 API Key）
+    # - openai: 用 OpenAI 做 Embedding（需要 OpenAI API Key）
+    # - ollama: 用本地 Ollama 做 Embedding（免费，需安装 Ollama）
+    # - none: 禁用 RAG（AI优化和Agent仍可用）
+    embedding-provider: ${EMBEDDING_PROVIDER:none}
+    openrouter-api-key: ${OPENROUTER_API_KEY:}
+    openrouter-base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api}
+    openrouter-embedding-model: ${OPENROUTER_EMBEDDING_MODEL:nvidia/llama-nemotron-embed-vl-1b-v2:free}
     vector-store-dir: data/vectorstore
     max-context-issues: 20
     max-code-chars: 8000

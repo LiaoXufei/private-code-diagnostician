@@ -103,10 +103,25 @@ public class AiContextService {
     }
 
     private Path resolveProjectFilePath(String projectId, String path) {
+        if (path == null || path.isBlank()) {
+            return null;
+        }
         List<ProjectFile> files = fileRepository.findByProjectId(projectId);
+        // 1. 精确匹配 filename 或 filePath
         for (ProjectFile pf : files) {
             if (path.equals(pf.getFilename()) || path.equals(pf.getFilePath())) {
-                return Paths.get(pf.getFilePath());
+                Path resolved = resolveStoredPath(pf.getFilePath());
+                if (resolved != null) {
+                    return resolved;
+                }
+            }
+        }
+        // 回退：按文件名部分匹配（Issue 中存的可能是带 uuid 前缀的物理路径）
+        String pathFileName = Paths.get(path).getFileName().toString();
+        for (ProjectFile pf : files) {
+            String pfFileName = Paths.get(pf.getFilePath()).getFileName().toString();
+            if (pathFileName.equals(pfFileName)) {
+                return resolveStoredPath(pf.getFilePath());
             }
         }
         Path byName = Paths.get(appProperties.getUploadDir(), projectId, path);
@@ -114,5 +129,26 @@ public class AiContextService {
             return byName;
         }
         return null;
+    }
+
+    /**
+     * 将 DB 中存储的 filePath（形如 /uploads/{projectId}/{storedFilename}）
+     * 解析为磁盘绝对路径。filePath 带前导斜杠，不能直接 Paths.get(filePath)
+     * （Windows 下会被当成当前盘根下的 uploads 目录），需相对 uploadRoot 重建。
+     */
+    private Path resolveStoredPath(String filePath) {
+        if (filePath == null || filePath.isBlank()) {
+            return null;
+        }
+        String relative = filePath.startsWith("/") ? filePath.substring(1) : filePath;
+        Path root = appProperties.uploadRoot();
+        // relative 形如 uploads/{projectId}/{storedFilename}，去掉首段 uploads/ 后拼到 uploadRoot
+        int firstSep = relative.indexOf('/');
+        String tail = firstSep >= 0 ? relative.substring(firstSep + 1) : relative;
+        Path resolved = root.resolve(tail).normalize();
+        if (!resolved.startsWith(root)) {
+            return null; // 防止路径穿越逃逸出 uploadRoot
+        }
+        return resolved;
     }
 }

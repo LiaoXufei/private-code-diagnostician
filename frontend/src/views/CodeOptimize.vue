@@ -11,6 +11,22 @@
     </div>
 
     <div class="content-container">
+      <a-alert
+        v-if="aiStatus && !aiStatus.enabled"
+        type="error"
+        show-icon
+        message="AI 功能未启用"
+        description="后端 app.ai.enabled=false，请联系管理员开启"
+        style="margin-bottom: 16px"
+      />
+      <a-alert
+        v-if="apiKeyMissing"
+        type="warning"
+        show-icon
+        message="未检测到有效的 LLM API Key"
+        :description="apiKeyHint"
+        style="margin-bottom: 16px"
+      />
       <a-row :gutter="24">
         <a-col :span="10">
           <a-card title="分析问题" class="issues-panel">
@@ -114,6 +130,9 @@ const fixLoading = ref(false)
 const showDiff = ref(false)
 const originalCode = ref('')
 const fixedCode = ref('')
+const aiStatus = ref(null)
+const apiKeyMissing = ref(false)
+const apiKeyHint = ref('')
 
 const renderedContent = computed(() => {
   return aiContent.value
@@ -196,7 +215,7 @@ async function generateFix() {
     })
     await loadCodeForDiff()
   } catch (e) {
-    message.error('生成修复代码失败')
+    message.error('生成修复代码失败: ' + (e.message || '请检查 AI 配置'))
   } finally {
     fixLoading.value = false
   }
@@ -216,7 +235,25 @@ async function loadCodeForDiff() {
   }
 }
 
-onMounted(loadIssues)
+async function checkAiStatus() {
+  try {
+    const res = await aiApi.getStatus()
+    aiStatus.value = res.data
+    const provider = res.data?.activeProvider || 'deepseek'
+    apiKeyHint.value = `请在后端配置环境变量 OPENAI_API_KEY（当前提供商: ${provider}）。` +
+      'DeepSeek 注册地址: https://platform.deepseek.com ；' +
+      '或本地模型: 设置 AI_PROVIDER=ollama 并启动 Ollama'
+    // 无法直接检测 API Key 是否有效，但可以提示用户
+    apiKeyMissing.value = false
+  } catch {
+    apiKeyMissing.value = true
+  }
+}
+
+onMounted(async () => {
+  await checkAiStatus()
+  await loadIssues()
+})
 </script>
 
 <style scoped>

@@ -34,9 +34,14 @@ public class AiController {
         Map<String, Object> status = new LinkedHashMap<>();
         status.put("enabled", aiProperties.isEnabled());
         status.put("activeProvider", aiProperties.getActiveProvider());
-        status.put("features", List.of("optimize", "chat", "rag", "agent", "mcp"));
+        status.put("embeddingProvider", aiProperties.getEmbeddingProvider());
+        status.put("ragEnabled", embeddingService.isRagEnabled());
+        status.put("features", List.of("optimize", "chat", "agent", "mcp"));
         status.put("mcpEndpoint", "/mcp");
         status.put("totalRequests", aiRequestCounter.get());
+        status.put("hint", aiProperties.getEmbeddingProvider().equals("none")
+                ? "RAG 未启用（embedding-provider=none），AI优化和Agent可用，代码对话为降级模式"
+                : "RAG 已启用");
         return status;
     }
 
@@ -44,6 +49,7 @@ public class AiController {
     public Map<String, Object> listModels() {
         return Map.of(
                 "activeProvider", aiProperties.getActiveProvider(),
+                "embeddingProvider", aiProperties.getEmbeddingProvider(),
                 "providers", List.of("openai", "deepseek", "qwen", "ollama"),
                 "note", "通过环境变量 AI_PROVIDER 与 OPENAI_BASE_URL 切换模型"
         );
@@ -103,6 +109,15 @@ public class AiController {
         );
     }
 
+    @DeleteMapping("/projects/{id}/ai/conversations/{conversationId}")
+    public Map<String, Object> deleteConversation(
+            @PathVariable String id,
+            @PathVariable String conversationId
+    ) {
+        chatService.deleteConversation(id, conversationId);
+        return Map.of("id", conversationId, "deleted", true);
+    }
+
     @GetMapping("/projects/{id}/ai/conversations/{conversationId}/messages")
     public List<Map<String, Object>> listMessages(
             @PathVariable String id,
@@ -146,7 +161,15 @@ public class AiController {
                                 emitter.completeWithError(e);
                             }
                         },
-                        emitter::completeWithError,
+                        error -> {
+                            // 把错误信息作为最后一个 SSE 事件发给前端，再关闭
+                            try {
+                                String errMsg = error.getMessage() != null ? error.getMessage() : error.getClass().getSimpleName();
+                                emitter.send(SseEmitter.event().name("error").data("[AI_ERROR] " + errMsg));
+                            } catch (IOException ignored) {
+                            }
+                            emitter.completeWithError(error);
+                        },
                         emitter::complete
                 );
         return emitter;

@@ -1,9 +1,9 @@
 package com.diagnostician.config;
 
-import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.SimpleVectorStore;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -12,17 +12,27 @@ import java.io.File;
 @Configuration
 public class RagConfig {
 
+    /**
+     * 当 embedding-provider 不为 none 时创建 VectorStore。
+     * 支持 openrouter / openai / ollama 三种 Embedding 来源。
+     */
     @Bean
+    @ConditionalOnExpression("!'none'.equalsIgnoreCase('${app.ai.embedding-provider:none}')")
     public VectorStore vectorStore(EmbeddingModel embeddingModel, AiProperties aiProperties) {
         File dir = new File(aiProperties.getVectorStoreDir());
         if (!dir.exists()) {
             dir.mkdirs();
         }
-        return SimpleVectorStore.builder(embeddingModel).build();
-    }
-
-    @Bean
-    public QuestionAnswerAdvisor questionAnswerAdvisor(VectorStore vectorStore) {
-        return QuestionAnswerAdvisor.builder(vectorStore).build();
+        SimpleVectorStore store = SimpleVectorStore.builder(embeddingModel).build();
+        // 启动时加载已持久化的向量，避免每次重启都要重新索引
+        File persistFile = new File(dir, "vectorstore.json");
+        if (persistFile.exists()) {
+            try {
+                store.load(persistFile);
+            } catch (Exception ignored) {
+                // 持久化文件损坏时忽略，后续重新索引即可
+            }
+        }
+        return store;
     }
 }

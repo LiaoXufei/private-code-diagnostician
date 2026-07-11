@@ -108,12 +108,18 @@ public class AiOptimizeService {
     public Flux<String> streamFixCode(String projectId, String issueId) {
         Analysis analysis = contextService.requireLatestAnalysis(projectId);
         Issue target = contextService.getIssuesForAnalysis(analysis.getId()).stream()
-                .filter(i -> issueId.equals(i.getId()))
+                .filter(i -> issueId != null && issueId.equals(i.getId()))
                 .findFirst()
                 .orElseThrow(() -> new com.diagnostician.exception.ResourceNotFoundException("未找到对应问题"));
 
-        String content = contextService.readFileContent(projectId, target.getFile());
-        String codeContext = contextService.extractCodeContext(content, target.getLine() != null ? target.getLine() : 1, 20);
+        String codeContext;
+        try {
+            String content = contextService.readFileContent(projectId, target.getFile());
+            codeContext = contextService.extractCodeContext(content, target.getLine() != null ? target.getLine() : 1, 20);
+        } catch (Exception e) {
+            codeContext = "（无法读取源码，文件: " + target.getFile() + "，错误: " + e.getMessage() + "）\n" +
+                    "请基于问题描述和规则建议给出修复方案。";
+        }
 
         String prompt = """
                 你是代码修复助手。请只输出修复后的代码片段（Markdown 代码块），并附一行修改说明。
