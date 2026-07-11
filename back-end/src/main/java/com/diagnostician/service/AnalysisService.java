@@ -5,6 +5,7 @@ import com.diagnostician.entity.*;
 import com.diagnostician.exception.AnalysisFailedException;
 import com.diagnostician.exception.ResourceNotFoundException;
 import com.diagnostician.repository.*;
+import com.diagnostician.service.ai.EmbeddingService;
 import com.diagnostician.service.model.analyzer.Analyzer;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,7 @@ public class AnalysisService {
     private final AnalysisAsyncLauncher asyncLauncher;
     private final TransactionTemplate transactionTemplate;
     private final AppProperties appProperties;
+    private final EmbeddingService embeddingService;
 
     public AnalysisService(
             ProjectRepository projectRepository,
@@ -48,7 +50,8 @@ public class AnalysisService {
             AnalysisWebSocketHub webSocketHub,
             AnalysisAsyncLauncher asyncLauncher,
             PlatformTransactionManager transactionManager,
-            AppProperties appProperties
+            AppProperties appProperties,
+            EmbeddingService embeddingService
     ) {
         this.projectRepository = projectRepository;
         this.fileRepository = fileRepository;
@@ -62,6 +65,7 @@ public class AnalysisService {
         this.asyncLauncher = asyncLauncher;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.appProperties = appProperties;
+        this.embeddingService = embeddingService;
     }
 
     /**
@@ -297,6 +301,11 @@ public class AnalysisService {
         Map<String, Object> result = buildResultPayload(
                 projectId, completedProject, completedAnalysis, dimensions, allIssues);
         webSocketHub.send(projectId, "analysis_completed", Map.of("result", result));
+        try {
+            embeddingService.indexProject(projectId);
+        } catch (Exception ignored) {
+            // RAG 索引失败不影响主分析流程
+        }
         pushProgress(projectId, progressTracker.get(projectId).orElse(progress));
     }
 
