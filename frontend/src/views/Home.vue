@@ -49,7 +49,7 @@
               title="活跃项目"
               :value="projectStore.activeProjects.length"
               :prefix="h(ExperimentOutlined)"
-              value-style="{ color: '#1890ff' }"
+              :value-style="{ color: '#1890ff' }"
             />
           </a-card>
         </a-col>
@@ -59,7 +59,7 @@
               title="已完成分析"
               :value="completedAnalysisCount"
               :prefix="h(CheckCircleOutlined)"
-              value-style="{ color: '#52c41a' }"
+              :value-style="{ color: '#52c41a' }"
             />
           </a-card>
         </a-col>
@@ -71,7 +71,7 @@
               :precision="1"
               suffix="分"
               :prefix="h(StarOutlined)"
-              value-style="{ color: '#faad14' }"
+              :value-style="{ color: '#faad14' }"
             />
           </a-card>
         </a-col>
@@ -258,26 +258,14 @@ const analyzeProject = (project) => {
 }
 
 const handleUpload = (project) => {
-  console.log('🟢 Home.handleUpload 被调用，项目ID:', project.id)
-  console.log('🟢 即将跳转到:', `/project/${project.id}/upload`)
   router.push(`/project/${project.id}/upload`)
 }
 
 const handleReport = (project) => {
-  console.log('🟢 Home.handleReport 被调用，项目ID:', project.id)
-  console.log('🟢 即将跳转到:', `/project/${project.id}/report`)
-
-  try {
-    router.push(`/project/${project.id}/report`)
-    console.log('🟢 Home.router.push 成功调用')
-  } catch (error) {
-    console.error('🟢 Home.router.push 失败:', error)
-  }
+  router.push(`/project/${project.id}/report`)
 }
 
 const handleView = (project) => {
-  console.log('🟢 Home.handleView 被调用，项目ID:', project.id)
-  console.log('🟢 即将跳转到:', `/project/${project.id}/config`)
   router.push(`/project/${project.id}/config`)
 }
 
@@ -291,7 +279,6 @@ const deleteProject = (project) => {
     async onOk() {
       try {
         await projectStore.deleteProject(project.id)
-        message.success('项目删除成功')
       } catch (error) {
         console.error('删除项目失败:', error)
       }

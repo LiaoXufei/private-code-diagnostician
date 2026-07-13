@@ -189,13 +189,16 @@ public class StructureAnalysisMetric extends BaseMetric implements Metric{
         for (Object obj : cu.imports()) {
             if (obj instanceof ImportDeclaration imp) {
                 String importName = imp.getName().getFullyQualifiedName();
-                if (importName.contains(packageName)) {
+                if (importName.equals(packageName) || importName.startsWith(packageName + ".")) {
+                    continue;
+                }
+                if (packageName.startsWith(importName + ".")) {
                     Issue issue = new Issue();
                     issue.setFile(filePath);
-                    issue.setLine(cu.getLineNumber(imp.getStartPosition()));  // 导入语句行号
-                    issue.setType("circular_dependency");  // 问题类型：循环依赖
-                    issue.setSeverity(SeverityEnum.HIGH.getMessage());  // 严重程度：主要
-                    issue.setMessage(String.format("可能存在循环引用: %s 引用了包含自身包 %s", packageName, importName));
+                    issue.setLine(cu.getLineNumber(imp.getStartPosition()));
+                    issue.setType("circular_dependency");
+                    issue.setSeverity(SeverityEnum.HIGH.getMessage());
+                    issue.setMessage(String.format("可能存在循环引用: 子包 %s 导入父包 %s", packageName, importName));
                     issue.setSuggestion("检查包依赖关系，避免相互引用或拆分依赖模块");
                     issues.add(issue);
                 }

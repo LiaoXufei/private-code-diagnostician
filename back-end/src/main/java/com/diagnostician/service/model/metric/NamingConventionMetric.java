@@ -29,7 +29,8 @@ public class NamingConventionMetric extends BaseMetric implements Metric {
 
     @Override
     public MetricResult analyze(ParseResult parseResult) {
-        // 1 提取 AST
+        totalNames = 0;
+        badNames = 0;
         JavaASTInfo astInfo = JavaASTExtractor.extractJavaAST(parseResult);
         if (astInfo == null) {
             return new MetricResult(0.0, new ArrayList<>(), this.getDescription(), this.getWeight());

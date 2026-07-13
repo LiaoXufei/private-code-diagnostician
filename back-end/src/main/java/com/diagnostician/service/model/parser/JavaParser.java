@@ -2,6 +2,7 @@ package com.diagnostician.service.model.parser;
 
 import com.diagnostician.service.model.common.LanguageType;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -11,7 +12,7 @@ public class JavaParser implements Parser {
 
     @Override
     public ParseResult parse(String filePath, byte[] content) throws Exception {
-        String contentStr = new String(content);
+        String contentStr = new String(content, StandardCharsets.UTF_8);
         String[] lines = contentStr.split("\n");
 
         BaseParseResult result = new BaseParseResult();

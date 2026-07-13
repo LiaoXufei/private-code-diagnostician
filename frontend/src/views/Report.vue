@@ -244,6 +244,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { useProjectStore } from '@/stores/project'
 import { projectApi } from '@/api/project'
+import { buildAuthHeaders } from '@/api/request'
 import * as echarts from 'echarts'
 import {
   BarChartOutlined,
@@ -466,39 +467,34 @@ const handleFileClick = (file) => {
   message.info(`点击了文件: ${getFileName(file.file)}`)
 }
 
-const exportReport = (format) => {
+const exportReport = async (format) => {
   const projectId = route.params.id
   if (!projectId) {
     message.error('项目ID不能为空')
     return
   }
-  if (format === 'pdf') {
-    const url = `/api/projects/${projectId}/report.pdf`
+  const ext = format === 'pdf' ? 'pdf' : 'md'
+  const url = `/api/projects/${projectId}/report.${ext}`
+  try {
+    const response = await fetch(url, { headers: buildAuthHeaders() })
+    if (!response.ok) {
+      message.error(`报告导出失败（${response.status}）`)
+      return
+    }
+    const blob = await response.blob()
+    const objectUrl = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url
-    a.target = '_blank'
-    a.rel = 'noopener'
-    a.download = `report-${projectId}.pdf`
+    a.href = objectUrl
+    a.download = `report-${projectId}.${ext}`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    message.success('开始下载PDF报告')
-    return
+    URL.revokeObjectURL(objectUrl)
+    message.success(`已开始下载${format === 'pdf' ? 'PDF' : 'Markdown'}报告`)
+  } catch (error) {
+    console.error('导出报告失败:', error)
+    message.error('报告导出失败，请稍后重试')
   }
-  if (format === 'md') {
-    const url = `/api/projects/${projectId}/report.md`
-    const a = document.createElement('a')
-    a.href = url
-    a.target = '_blank'
-    a.rel = 'noopener'
-    a.download = `report-${projectId}.md`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    message.success('开始下载Markdown报告')
-    return
-  }
-  message.info('暂未支持的导出格式')
 }
 
 const goToOptimize = () => {
@@ -535,23 +531,21 @@ const reanalyze = () => {
   }
 }
 
+const handleRadarResize = () => {
+  radarChart.value?.resize()
+}
+
 // 雷达图相关方法
 const initRadarChart = () => {
   if (!radarChartRef.value) return
 
-  // 销毁已存在的图表实例
   if (radarChart.value) {
     teardownRadarHover(radarChart.value)
     radarChart.value.dispose()
   }
 
-  // 创建新的图表实例
   radarChart.value = echarts.init(radarChartRef.value)
-
-  // 监听窗口大小变化，调整图表大小
-  window.addEventListener('resize', () => {
-    radarChart.value?.resize()
-  })
+  window.addEventListener('resize', handleRadarResize)
 }
 
 const updateRadarChart = () => {
@@ -821,9 +815,7 @@ onUnmounted(() => {
   }
 
   // 移除事件监听器
-  window.removeEventListener('resize', () => {
-    radarChart.value?.resize()
-  })
+  window.removeEventListener('resize', handleRadarResize)
 })
 </script>
 

@@ -273,13 +273,13 @@
                 </div>
               </div>
 
-              <div v-else-if="analysisStore.isError" class="error-state">
+              <div v-else-if="analysisStore.hasError" class="error-state">
                 <div class="error-content">
                   <div class="error-icon">
                     <CloseCircleOutlined />
                   </div>
                   <h3>分析失败</h3>
-                  <p>{{ analysisStore.error || '分析过程中发生错误' }}</p>
+                  <p>{{ analysisStore.analysisError || '分析过程中发生错误' }}</p>
                   <a-space>
                     <a-button type="primary" size="large" @click="retryAnalysis">
                       <RedoOutlined />
@@ -533,6 +533,7 @@ import {
   StopOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
+  ExclamationCircleOutlined,
   RedoOutlined,
   BarChartOutlined
 } from '@ant-design/icons-vue'
@@ -925,12 +926,12 @@ const getHistoryItemColor = (grade) => {
 
 const getHistoryIcon = (grade) => {
   const iconMap = {
-    excellent: 'CheckCircleOutlined',
-    good: 'CheckCircleOutlined',
-    fair: 'ExclamationCircleOutlined',
-    poor: 'CloseCircleOutlined'
+    excellent: CheckCircleOutlined,
+    good: CheckCircleOutlined,
+    fair: ExclamationCircleOutlined,
+    poor: CloseCircleOutlined
   }
-  return iconMap[grade] || 'CheckCircleOutlined'
+  return iconMap[grade] || CheckCircleOutlined
 }
 
 const getGradeColor = (grade) => {
@@ -979,9 +980,9 @@ const initializeAnalysisConfig = (project) => {
   // 根据项目描述设置严格程度
   const description = (project.description || '').toLowerCase()
   if (description.includes('生产') || description.includes('正式') || description.includes('企业')) {
-    analysisConfig.strictness = 'strict'
+    analysisConfig.strictness = 'high'
   } else if (description.includes('测试') || description.includes('实验') || description.includes('demo')) {
-    analysisConfig.strictness = 'relaxed'
+    analysisConfig.strictness = 'low'
   } else {
     analysisConfig.strictness = 'medium'
   }
@@ -1068,9 +1069,9 @@ const resetToProjectDefaults = async () => {
 const getStrictnessFromProject = (project) => {
   const description = (project.description || '').toLowerCase()
   if (description.includes('生产') || description.includes('正式') || description.includes('企业')) {
-    return 'strict'
+    return 'high'
   } else if (description.includes('测试') || description.includes('实验') || description.includes('demo')) {
-    return 'relaxed'
+    return 'low'
   }
   return 'medium'
 }

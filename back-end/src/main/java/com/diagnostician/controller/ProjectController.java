@@ -25,6 +25,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.nio.charset.StandardCharsets;
 import java.io.ByteArrayOutputStream;
 import com.vladsch.flexmark.parser.Parser;
@@ -33,13 +34,17 @@ import com.vladsch.flexmark.html.HtmlRenderer;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.diagnostician.service.model.report.Report;
 import com.diagnostician.service.model.analyzer.Analyzer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @CrossOrigin
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
 public class ProjectController {
+    private static final Logger log = LoggerFactory.getLogger(ProjectController.class);
     private static final int MAX_FILES_PER_PROJECT = 200;
+    private static final long MAX_FILE_CONTENT_BYTES = 5L * 1024 * 1024;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             ".java", ".js", ".ts", ".jsx", ".tsx", ".vue", ".py", ".go",
             ".c", ".cpp", ".h", ".hpp", ".cs", ".rs", ".lua", ".md", ".json", ".xml", ".yml", ".yaml", ".txt"
@@ -58,7 +63,6 @@ public class ProjectController {
     @GetMapping("/projects")
     public List<Map<String, Object>> listProjects() {
         List<Project> projects = projectRepository.findAll();
-        System.out.println("getProject called");
         Map<String, Analysis> lastAnalysisById = loadLastAnalyses(projects);
         return projects.stream()
                 .map(p -> convertProjectToMap(p, lastAnalysisById.get(p.getLastAnalysisId())))
@@ -72,40 +76,7 @@ public class ProjectController {
             return new ResponseEntity<>(new byte[0], HttpStatus.NOT_FOUND);
         }
         Project project = projectOpt.get();
-        Optional<Analysis> latestOpt = analysisRepository.findTopByProjectIdOrderByCreatedAtDesc(id);
-        int overall = latestOpt.map(Analysis::getOverallScore).orElse(0);
-        long totalLines = resolveTotalLines(id, latestOpt);
-        Analyzer.AnalysisResult ar = new Analyzer.AnalysisResult(
-                (100 - overall) / 100.0,
-                new HashMap<>(),
-                new ArrayList<>(),
-                project.getFileCount(),
-                (int) Math.min(Integer.MAX_VALUE, totalLines)
-        );
-        latestOpt.ifPresent(latest -> {
-            List<Dimension> dims = latest.getDimensions() != null ? latest.getDimensions() : List.of();
-            for (Dimension d : dims) {
-                ar.addMetric(d.getName(), new Analyzer.MetricResult(
-                        d.getName(),
-                        Math.max(0.0, Math.min(1.0, (100 - d.getScore()) / 100.0)),
-                        d.getName(),
-                        0.1
-                ));
-            }
-            List<Issue> issues = latest.getIssues() != null ? latest.getIssues() : List.of();
-            Map<String, List<Issue>> byFile = new LinkedHashMap<>();
-            for (Issue is : issues) {
-                String filePath = is.getFile() != null ? is.getFile() : "unknown";
-                byFile.computeIfAbsent(filePath, k -> new ArrayList<>()).add(is);
-            }
-            for (Map.Entry<String, List<Issue>> e : byFile.entrySet()) {
-                ar.addFileAnalysisResult(new Analyzer.FileAnalysisResult(
-                        e.getKey(),
-                        Math.max(0.0, Math.min(1.0, (100 - overall) / 100.0)),
-                        e.getValue()
-                ));
-            }
-        });
+        Analyzer.AnalysisResult ar = buildAnalysisResultForReport(project, id);
         Report.ReportOptions opts = new Report.ReportOptions();
         opts.markdownOutput = true;
         String md = report.generateReport(ar, opts);
@@ -114,6 +85,9 @@ public class ProjectController {
         Node document = parser.parse(md);
         HtmlRenderer renderer = HtmlRenderer.builder().build();
         String htmlBody = renderer.render(document);
+        Optional<Analysis> latestOpt = analysisRepository.findTopByProjectIdOrderByCreatedAtDesc(id);
+        int overall = latestOpt.map(Analysis::getOverallScore).orElse(0);
+        long totalLines = resolveTotalLines(id, latestOpt);
         StringBuilder sb = new StringBuilder();
         sb.append("<!DOCTYPE html>\n");
         sb.append("<html xmlns=\"http://www.w3.org/1999/xhtml\">\n");
@@ -166,42 +140,7 @@ public class ProjectController {
             return new ResponseEntity<>(new byte[0], HttpStatus.NOT_FOUND);
         }
         Project project = projectOpt.get();
-
-        Optional<Analysis> latestOpt = analysisRepository.findTopByProjectIdOrderByCreatedAtDesc(id);
-        int overall = latestOpt.map(Analysis::getOverallScore).orElse(0);
-        long totalLines = resolveTotalLines(id, latestOpt);
-        Analyzer.AnalysisResult ar = new Analyzer.AnalysisResult(
-                (100 - overall) / 100.0,
-                new HashMap<>(),
-                new ArrayList<>(),
-                project.getFileCount(),
-                (int) Math.min(Integer.MAX_VALUE, totalLines)
-        );
-        latestOpt.ifPresent(latest -> {
-            List<Dimension> dims = latest.getDimensions() != null ? latest.getDimensions() : List.of();
-            for (Dimension d : dims) {
-                ar.addMetric(d.getName(), new Analyzer.MetricResult(
-                        d.getName(),
-                        Math.max(0.0, Math.min(1.0, (100 - d.getScore()) / 100.0)),
-                        d.getName(),
-                        0.1
-                ));
-            }
-            List<Issue> issues = latest.getIssues() != null ? latest.getIssues() : List.of();
-            Map<String, List<Issue>> byFile = new LinkedHashMap<>();
-            for (Issue is : issues) {
-                String filePath = is.getFile() != null ? is.getFile() : "unknown";
-                byFile.computeIfAbsent(filePath, k -> new ArrayList<>()).add(is);
-            }
-            for (Map.Entry<String, List<Issue>> e : byFile.entrySet()) {
-                ar.addFileAnalysisResult(new Analyzer.FileAnalysisResult(
-                        e.getKey(),
-                        Math.max(0.0, Math.min(1.0, (100 - overall) / 100.0)),
-                        e.getValue()
-                ));
-            }
-        });
-
+        Analyzer.AnalysisResult ar = buildAnalysisResultForReport(project, id);
         Report.ReportOptions opts = new Report.ReportOptions();
         opts.markdownOutput = true;
         String md = report.generateReport(ar, opts);
@@ -216,12 +155,17 @@ public class ProjectController {
     @PostMapping("/projects")
     public Map<String, Object> createProject(@RequestBody Map<String, Object> body) {
         Project project = new Project();
-        project.setName((String) body.getOrDefault("name", "新项目"));
-        project.setDescription((String) body.getOrDefault("description", ""));
-        project.setLanguage((String) body.getOrDefault("language", "javascript"));
+        Object nameObj = body.get("name");
+        String name = nameObj instanceof String s && !s.isBlank() ? s.trim() : "新项目";
+        Object descObj = body.get("description");
+        String description = descObj instanceof String s ? s : "";
+        Object langObj = body.get("language");
+        String language = langObj instanceof String s && !s.isBlank() ? s : "javascript";
+        project.setName(name);
+        project.setDescription(description);
+        project.setLanguage(language);
         project.setStatus("active");
         project.setFileCount(0);
-        System.out.println("createProject called");
         Project saved = projectRepository.save(project);
         return convertProjectToMap(saved, null);
     }
@@ -259,19 +203,26 @@ public class ProjectController {
         Optional<Project> projectOpt = projectRepository.findById(id);
         if (projectOpt.isPresent()) {
             Project project = projectOpt.get();
-            // 1. 删除本地文件
             try {
-                Path base = appProperties.projectDir(id);
-                if (Files.exists(base)) {
-                    Files.walk(base)
-                            .sorted(Comparator.reverseOrder())
-                            .forEach(p -> {
-                                try { Files.deleteIfExists(p); } catch (IOException ignored) {}
-                            });
+                analysisService.cancelAnalysis(id);
+            } catch (Exception e) {
+                log.debug("删除项目前取消分析（可忽略）: projectId={}, {}", id, e.getMessage());
+            }
+            Path base = appProperties.projectDir(id);
+            if (Files.exists(base)) {
+                try (Stream<Path> walk = Files.walk(base)) {
+                    walk.sorted(Comparator.reverseOrder()).forEach(p -> {
+                        try {
+                            Files.deleteIfExists(p);
+                        } catch (IOException ex) {
+                            log.warn("删除项目文件失败: {}", p, ex);
+                        }
+                    });
+                } catch (IOException e) {
+                    log.warn("遍历项目目录失败: {}", base, e);
                 }
-            } catch (Exception ignored) {}
+            }
 
-            // 2. 删除数据库记录（级联删除文件、分析结果等）
             projectRepository.delete(project);
             return Map.<String, Object>of("message", "项目删除成功", "id", id);
         } else {
@@ -315,8 +266,12 @@ public class ProjectController {
             throw new ResourceNotFoundException("文件不存在: " + path);
         }
 
-        String content = Files.readString(absPath, StandardCharsets.UTF_8);
         long size = Files.size(absPath);
+        if (size > MAX_FILE_CONTENT_BYTES) {
+            throw new BadRequestException("文件过大，单文件内容读取上限为 5MB");
+        }
+
+        String content = Files.readString(absPath, StandardCharsets.UTF_8);
         return Map.of("path", path, "content", content, "size", size);
     }
 
@@ -421,12 +376,9 @@ public class ProjectController {
                                 "file_path", file.getFilePath()
                         )
                 );
-            } else {
-                throw new ResourceNotFoundException("文件不属于该项目");
             }
-        } else {
-            throw new ResourceNotFoundException("文件不存在");
         }
+        throw new ResourceNotFoundException("文件不存在");
     }
 
     @DeleteMapping("/projects/{id}/files")
@@ -465,7 +417,6 @@ public class ProjectController {
     // -------------------------- 分析管理 --------------------------
     @PostMapping("/projects/{id}/analyze")
     public Map<String, Object> analyze(@PathVariable String id) {
-        System.out.println("AnalyseRe");
         return analysisService.startAnalysis(id);
     }
 
@@ -489,10 +440,10 @@ public class ProjectController {
         Optional<Analysis> analysisOpt = analysisRepository.findTopByProjectIdOrderByCreatedAtDesc(id);
         if (analysisOpt.isPresent()) {
             Analysis analysis = analysisOpt.get();
-            Project project = projectRepository.findById(id).get(); // 已判断项目存在，直接get
-            List<Issue> issues = analysis.getIssues();
+            Project project = projectRepository.findById(id).get();
+            List<Issue> issues = analysis.getIssues() != null ? analysis.getIssues() : List.of();
+            List<Dimension> dimensions = analysis.getDimensions() != null ? analysis.getDimensions() : List.of();
 
-            // 统计指标
             Map<String, Object> metrics = new LinkedHashMap<>();
             metrics.put("fileCount", project.getFileCount());
             metrics.put("totalIssues", issues.size());
@@ -500,10 +451,8 @@ public class ProjectController {
             metrics.put("majorIssues", issues.stream().filter(i -> "medium".equalsIgnoreCase(i.getSeverity())).count());
             metrics.put("minorIssues", issues.stream().filter(i -> "low".equalsIgnoreCase(i.getSeverity())).count());
 
-            // 优化建议
             Map<String, Object> summary = new LinkedHashMap<>();
-            // 建议文案走 Translator，避免控制器硬编码中文
-            summary.put("suggestions", analysis.getDimensions().stream()
+            summary.put("suggestions", dimensions.stream()
                     .map(d -> report.translateSuggestion(d.getName()))
                     .collect(Collectors.toList()));
 
@@ -533,7 +482,7 @@ public class ProjectController {
             resp.put("projectName", project.getName());
             resp.put("overallScore", analysis.getOverallScore());
             resp.put("grade", analysis.getGrade());
-            resp.put("dimensions", analysis.getDimensions().stream().map(this::convertToMap).collect(Collectors.toList()));
+            resp.put("dimensions", dimensions.stream().map(this::convertToMap).collect(Collectors.toList()));
             resp.put("issues", issuesOut);
             resp.put("fileResults", fileResults);
             resp.put("completedAt", analysis.getCreatedAt().toString());
@@ -593,7 +542,7 @@ public class ProjectController {
                 ));
 
                 // 维度日志
-                for (Dimension dim : analysis.getDimensions()) {
+                for (Dimension dim : analysis.getDimensions() != null ? analysis.getDimensions() : List.<Dimension>of()) {
                     logs.add(Map.of(
                             "timestamp", analysis.getCreatedAt().toString(),
                             "level", "debug",
@@ -631,7 +580,8 @@ public class ProjectController {
                         "completedAt", analysis.getCreatedAt().toString(),
                         "overallScore", analysis.getOverallScore(),
                         "grade", analysis.getGrade(),
-                        "dimensions", analysis.getDimensions().stream().map(this::convertToMap).collect(Collectors.toList())
+                        "dimensions", (analysis.getDimensions() != null ? analysis.getDimensions() : List.<Dimension>of())
+                                .stream().map(this::convertToMap).collect(Collectors.toList())
                 ))
                 .collect(Collectors.toList());
     }
@@ -797,7 +747,45 @@ public class ProjectController {
         return map;
     }
 
-    /** 解析项目文件的绝对路径：优先匹配 DB filePath，再回退 basename */
+    private Analyzer.AnalysisResult buildAnalysisResultForReport(Project project, String projectId) {
+        Optional<Analysis> latestOpt = analysisRepository.findTopByProjectIdOrderByCreatedAtDesc(projectId);
+        int overall = latestOpt.map(Analysis::getOverallScore).orElse(0);
+        long totalLines = resolveTotalLines(projectId, latestOpt);
+        Analyzer.AnalysisResult ar = new Analyzer.AnalysisResult(
+                (100 - overall) / 100.0,
+                new HashMap<>(),
+                new ArrayList<>(),
+                project.getFileCount(),
+                (int) Math.min(Integer.MAX_VALUE, totalLines)
+        );
+        latestOpt.ifPresent(latest -> {
+            List<Dimension> dims = latest.getDimensions() != null ? latest.getDimensions() : List.of();
+            for (Dimension d : dims) {
+                ar.addMetric(d.getName(), new Analyzer.MetricResult(
+                        d.getName(),
+                        Math.max(0.0, Math.min(1.0, (100 - d.getScore()) / 100.0)),
+                        d.getName(),
+                        0.1
+                ));
+            }
+            List<Issue> issues = latest.getIssues() != null ? latest.getIssues() : List.of();
+            Map<String, List<Issue>> byFile = new LinkedHashMap<>();
+            for (Issue is : issues) {
+                String filePath = is.getFile() != null ? is.getFile() : "unknown";
+                byFile.computeIfAbsent(filePath, k -> new ArrayList<>()).add(is);
+            }
+            for (Map.Entry<String, List<Issue>> e : byFile.entrySet()) {
+                ar.addFileAnalysisResult(new Analyzer.FileAnalysisResult(
+                        e.getKey(),
+                        Math.max(0.0, Math.min(1.0, (100 - overall) / 100.0)),
+                        e.getValue()
+                ));
+            }
+        });
+        return ar;
+    }
+
+    /** 解析项目文件的绝对路径：仅匹配 DB 记录，无记录时不回退磁盘直读 */
     private Path resolveProjectFilePath(String projectId, String path) {
         if (path == null || path.isBlank()) {
             return null;
@@ -815,7 +803,7 @@ public class ProjectController {
                 return appProperties.resolveStoredFile(projectId, stored);
             }
         }
-        return appProperties.resolveStoredFile(projectId, filename);
+        return null;
     }
 
     /** 优先使用已持久化的文件行数，避免报告导出时重复读盘 */
@@ -831,9 +819,10 @@ public class ProjectController {
             String storedName = Paths.get(pf.getFilePath()).getFileName().toString();
             Path abs = appProperties.resolveStoredFile(projectId, storedName);
             if (Files.exists(abs)) {
-                try {
-                    total += Files.lines(abs, StandardCharsets.UTF_8).count();
-                } catch (IOException ignored) {
+                try (Stream<String> lines = Files.lines(abs, StandardCharsets.UTF_8)) {
+                    total += lines.count();
+                } catch (IOException e) {
+                    log.debug("读取文件行数失败: {}", abs);
                 }
             }
         }

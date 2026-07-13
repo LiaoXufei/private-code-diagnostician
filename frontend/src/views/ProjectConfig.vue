@@ -428,11 +428,7 @@ const saveAndNext = async () => {
     } else {
       // 创建新项目
       const newProjectData = {
-        id: Date.now().toString(),
         ...projectData,
-        status: 'active',
-        // createdAt: new Date().toISOString(),
-        // updatedAt: new Date().toISOString(),
         status: basicForm.status || 'active',
         fileCount: 0,
         lastAnalysis: null

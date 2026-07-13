@@ -1,11 +1,16 @@
 package com.diagnostician.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -15,6 +20,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Component
 public class AnalysisWebSocketHub {
+
+    private static final Logger log = LoggerFactory.getLogger(AnalysisWebSocketHub.class);
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<String, Set<WebSocketSession>> sessionsByProject = new ConcurrentHashMap<>();
@@ -42,17 +49,26 @@ public class AnalysisWebSocketHub {
         }
         try {
             String json = objectMapper.writeValueAsString(Map.of("type", type, "payload", payload));
-            TextMessage message = new TextMessage(json);
+            List<WebSocketSession> deadSessions = new ArrayList<>();
             for (WebSocketSession session : sessions) {
-                if (session.isOpen()) {
+                if (!session.isOpen()) {
+                    deadSessions.add(session);
+                    continue;
+                }
+                try {
                     synchronized (session) {
-                        session.sendMessage(message);
+                        session.sendMessage(new TextMessage(json));
                     }
+                } catch (IOException e) {
+                    log.warn("WebSocket 推送失败: projectId={}, sessionId={}", projectId, session.getId(), e);
+                    deadSessions.add(session);
                 }
             }
+            for (WebSocketSession dead : deadSessions) {
+                unregister(projectId, dead);
+            }
         } catch (IOException e) {
-            // 推送失败不影响分析主流程
-            e.printStackTrace();
+            log.warn("WebSocket 消息序列化失败: projectId={}, type={}", projectId, type, e);
         }
     }
 }

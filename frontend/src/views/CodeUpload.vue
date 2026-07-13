@@ -213,7 +213,7 @@
                 <a-button
                   type="primary"
                   block
-                  :disabled="hasUploadedFiles"
+                  :disabled="displayFiles.length === 0"
                   @click="startAnalysis"
                 >
                   <ExperimentOutlined />
@@ -221,7 +221,7 @@
                 </a-button>
                 <a-button
                   block
-                  :disabled="hasUploadedFiles"
+                  :disabled="displayFiles.length === 0"
                   @click="clearAllFiles"
                 >
                   <ClearOutlined />
@@ -253,8 +253,8 @@
             <div class="upload-tips">
               <h4>上传提示</h4>
               <ul>
-                <li>单个文件大小不超过 10MB</li>
-                <li>项目总大小不超过 100MB</li>
+                <li>单个文件大小不超过 50MB</li>
+                <li>项目总大小不超过 200MB</li>
                 <li>支持常见的编程语言文件格式</li>
                 <li>自动忽略 .gitignore 中指定的文件</li>
               </ul>
@@ -281,8 +281,6 @@ import {
   DownloadOutlined,
   ExperimentOutlined,
   ClearOutlined,
-  RightOutlined,
-  HddOutlined,
   CheckSquareOutlined,
   BorderOutlined
 } from '@ant-design/icons-vue'
@@ -334,7 +332,30 @@ const loadProjectFiles = async () => {
   }
 }
 
-const hasUploadedFiles = computed(() => uploadedFiles.value.length > 0)
+const supportedFormats = [
+  '.java', '.js', '.ts', '.jsx', '.tsx', '.vue', '.py', '.go',
+  '.c', '.cpp', '.h', '.hpp', '.cs', '.rs', '.lua', '.md',
+  '.json', '.xml', '.yml', '.yaml', '.txt'
+]
+
+const beforeUpload = (file) => {
+  const isValidSize = file.size / 1024 / 1024 < 50
+  if (!isValidSize) {
+    message.error('文件大小不能超过 50MB')
+    return false
+  }
+
+  const isValidType = supportedFormats.some(format =>
+    file.name.toLowerCase().endsWith(format)
+  )
+  if (!isValidType) {
+    message.error('不支持的文件格式')
+    return false
+  }
+
+  // 阻止自动上传，我们将手动触发上传
+  return false
+}
 
 // 始终使用数据库中的真实文件数据
 const displayFileStats = computed(() => {
@@ -357,34 +378,6 @@ const fileTypeStats = computed(() => {
   })
   return stats
 })
-
-const supportedFormats = [
-  '.js', '.jsx', '.ts', '.tsx', '.vue',
-  '.java', '.py', '.cpp', '.c', '.cs', '.go', '.rs',
-  '.php', '.rb', '.swift', '.kt',
-  '.html', '.css', '.scss', '.less', '.sass',
-  '.json', '.xml', '.yaml', '.yml', '.md',
-  '.txt', '.sql'
-]
-
-const beforeUpload = (file) => {
-  const isValidSize = file.size / 1024 / 1024 < 10
-  if (!isValidSize) {
-    message.error('文件大小不能超过 10MB')
-    return false
-  }
-
-  const isValidType = supportedFormats.some(format =>
-    file.name.toLowerCase().endsWith(format)
-  )
-  if (!isValidType) {
-    message.error('不支持的文件格式')
-    return false
-  }
-
-  // 阻止自动上传，我们将手动触发上传
-  return false
-}
 
 const handleFileChange = ({ fileList: newFileList }) => {
   fileList.value = newFileList.slice(-10) // 最多保留10个文件
@@ -412,13 +405,13 @@ const handleDrop = (e) => {
   const invalidFiles = []
 
   files.forEach(file => {
-    const isValidSize = file.size / 1024 / 1024 < 10
+    const isValidSize = file.size / 1024 / 1024 < 50
     const isValidType = supportedFormats.some(format =>
       file.name.toLowerCase().endsWith(format)
     )
 
     if (!isValidSize) {
-      invalidFiles.push({ name: file.name, error: '文件大小超过10MB' })
+      invalidFiles.push({ name: file.name, error: '文件大小超过50MB' })
     } else if (!isValidType) {
       invalidFiles.push({ name: file.name, error: '不支持的文件格式' })
     } else {
@@ -685,7 +678,7 @@ const analyzeSelectedFiles = () => {
   }
 
   // 存储选中的文件到localStorage供分析页面使用
-  localStorage.setItem('selectedFiles', JSON.stringify(selectedFiles.value.map(f => ({
+  localStorage.setItem('selectedAnalysisFiles', JSON.stringify(selectedFiles.value.map(f => ({
     id: f.id,
     name: f.filename || f.file_name || f.name,
     size: f.file_size || f.size,
@@ -693,11 +686,7 @@ const analyzeSelectedFiles = () => {
   }))))
 
   message.success(`已选择 ${selectedFiles.value.length} 个文件，即将跳转到分析页面`)
-
-  // 跳转到分析页面
-  setTimeout(() => {
-    router.push(`/project/${projectId}/analysis`)
-  }, 1000)
+  router.push(`/project/${projectId}/analysis`)
 }
 
 const getFileExtension = (filename) => {

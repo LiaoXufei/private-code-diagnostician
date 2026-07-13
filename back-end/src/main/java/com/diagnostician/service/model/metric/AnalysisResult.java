@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -20,7 +21,7 @@ public class AnalysisResult {
     int totalLines;                             // 总行数
     int commentLines;                           // 注释行数
     List<String> imports;                       // 导入的包
-    Map<String, MetricResult> metricResults;    // 各指标结果
+    Map<String, MetricResult> metricResults = new HashMap<>();    // 各指标结果
     List<Function> functions;                   // 函数列表
     ParseResult parseResult;                   // 解析结果
 
