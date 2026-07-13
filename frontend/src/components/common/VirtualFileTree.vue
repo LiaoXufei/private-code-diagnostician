@@ -342,11 +342,13 @@ const getFileIconColor = (item) => {
   return colorMap[ext] || '#666666'
 }
 
+const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 const highlightMatch = (text) => {
   if (!searchText.value) return text
 
   const search = searchText.value
-  const reg = new RegExp(`(${search})`, 'gi')
+  const reg = new RegExp(`(${escapeRegExp(search)})`, 'gi')
   return text.replace(reg, '<mark>$1</mark>')
 }
 

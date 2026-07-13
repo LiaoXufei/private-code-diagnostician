@@ -10,7 +10,6 @@ import com.diagnostician.service.model.analyzer.DefaultTranslator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -109,20 +108,6 @@ public class Report {
         return md.toString();
     }
 
-    private String renderMetrics(Map<String, MetricResult> metrics) {
-        if (metrics == null || metrics.isEmpty()) return t("report.metrics.none");
-        StringBuilder sb = new StringBuilder();
-        List<Map.Entry<String, MetricResult>> ordered = metrics.entrySet().stream()
-                .sorted(Comparator.comparingDouble(e -> -clamp01(e.getValue().getScore())))
-                .collect(Collectors.toList());
-        for (Map.Entry<String, MetricResult> e : ordered) {
-            MetricResult m = e.getValue();
-            double score = clamp01(m.getScore()) * 100.0;
-            sb.append(String.format(Locale.ROOT, "- %s: %.2f (w=%.2f) - %s\n", e.getKey(), score, m.getWeight(), nullSafe(m.getDescription())));
-        }
-        return sb.toString();
-    }
-
     private String renderMetricsMarkdown(Map<String, MetricResult> metrics) {
         if (metrics == null || metrics.isEmpty()) return "_" + t("report.metrics.none") + "_";
         StringBuilder sb = new StringBuilder();
@@ -134,41 +119,8 @@ public class Report {
         for (Map.Entry<String, MetricResult> e : ordered) {
             MetricResult m = e.getValue();
             double score = clamp01(m.getScore()) * 100.0;
-            sb.append(String.format(Locale.ROOT, "| %s | %.2f | %.2f | %s |\n", e.getKey(), score, m.getWeight(), escapeMd(nullSafe(m.getDescription()))));
-        }
-        return sb.toString();
-    }
-
-    private String renderTopIssues(List<FileAnalysisResult> files, int topFiles, int maxIssues) {
-        if (files == null || files.isEmpty()) return t("report.files.none");
-        StringBuilder sb = new StringBuilder();
-        List<FileAnalysisResult> ordered = files.stream()
-                .sorted(Comparator.comparingDouble(f -> -clamp01(f.getFileScore())))
-                .limit(Math.max(1, topFiles))
-                .collect(Collectors.toList());
-        for (FileAnalysisResult f : ordered) {
-            sb.append(String.format(Locale.ROOT, "* %s (%.2f)\n", f.getFilePath(), clamp01(f.getFileScore()) * 100.0));
-            List<String> issues = takeIssues(f.getIssues(), maxIssues);
-            for (String issue : issues) {
-                sb.append("  - ").append(issue).append("\n");
-            }
-        }
-        return sb.toString();
-    }
-
-    private String renderTopIssuesMarkdown(List<FileAnalysisResult> files, int topFiles, int maxIssues) {
-        if (files == null || files.isEmpty()) return "_" + t("report.files.none") + "_";
-        StringBuilder sb = new StringBuilder();
-        List<FileAnalysisResult> ordered = files.stream()
-                .sorted(Comparator.comparingDouble(f -> -clamp01(f.getFileScore())))
-                .limit(Math.max(1, topFiles))
-                .collect(Collectors.toList());
-        for (FileAnalysisResult f : ordered) {
-            sb.append(String.format(Locale.ROOT, "- `%s` (%.2f)\n", f.getFilePath(), clamp01(f.getFileScore()) * 100.0));
-            List<String> issues = takeIssues(f.getIssues(), maxIssues);
-            for (String issue : issues) {
-                sb.append("  - ").append(escapeMd(issue)).append("\n");
-            }
+            sb.append(String.format(Locale.ROOT, "| %s | %.2f | %.2f | %s |\n",
+                    escapeMd(e.getKey()), score, m.getWeight(), escapeMd(nullSafe(m.getDescription()))));
         }
         return sb.toString();
     }
@@ -180,7 +132,7 @@ public class Report {
                 .sorted(Comparator.comparingDouble(f -> -clamp01(f.getFileScore())))
                 .collect(Collectors.toList());
         for (FileAnalysisResult f : ordered) {
-            sb.append(String.format(Locale.ROOT, "- `%s` (%.2f)\n", f.getFilePath(), clamp01(f.getFileScore()) * 100.0));
+            sb.append(String.format(Locale.ROOT, "- `%s` (%.2f)\n", escapeMd(f.getFilePath()), clamp01(f.getFileScore()) * 100.0));
             List<Issue> issues = f.getIssues() != null ? f.getIssues() : List.of();
             for (Issue is : issues) {
                 String file = is.getFile() != null ? is.getFile() : f.getFilePath();
@@ -194,48 +146,6 @@ public class Report {
         return sb.toString();
     }
 
-    private String renderAllFiles(List<FileAnalysisResult> files, int maxIssues) {
-        if (files == null || files.isEmpty()) return t("report.files.none");
-        StringBuilder sb = new StringBuilder();
-        List<FileAnalysisResult> ordered = files.stream()
-                .sorted(Comparator.comparingDouble(f -> -clamp01(f.getFileScore())))
-                .collect(Collectors.toList());
-        for (FileAnalysisResult f : ordered) {
-            sb.append(String.format(Locale.ROOT, "* %s (%.2f)\n", f.getFilePath(), clamp01(f.getFileScore()) * 100.0));
-            List<String> issues = takeIssues(f.getIssues(), maxIssues);
-            for (String issue : issues) {
-                sb.append("  - ").append(issue).append("\n");
-            }
-        }
-        return sb.toString();
-    }
-
-    private String renderAllFilesMarkdown(List<FileAnalysisResult> files, int maxIssues) {
-        if (files == null || files.isEmpty()) return "_" + t("report.files.none") + "_";
-        StringBuilder sb = new StringBuilder();
-        List<FileAnalysisResult> ordered = files.stream()
-                .sorted(Comparator.comparingDouble(f -> -clamp01(f.getFileScore())))
-                .collect(Collectors.toList());
-        for (FileAnalysisResult f : ordered) {
-            sb.append(String.format(Locale.ROOT, "- `%s` (%.2f)\n", f.getFilePath(), clamp01(f.getFileScore()) * 100.0));
-            List<String> issues = takeIssues(f.getIssues(), maxIssues);
-            for (String issue : issues) {
-                sb.append("  - ").append(escapeMd(issue)).append("\n");
-            }
-        }
-        return sb.toString();
-    }
-
-    private String renderSummary(AnalysisResult result) {
-        int fileCount = result.getTotalFiles();
-        int totalLines = result.getTotalLines();
-        double score = clamp01(result.getCodeQualityScore()) * 100.0;
-        return String.format(Locale.ROOT, "%s: %d | %s: %d | %s: %.2f",
-                t("report.summary.files"), fileCount,
-                t("report.summary.lines"), totalLines,
-                t("report.summary.score"), score);
-    }
-
     private String renderSummaryMarkdown(AnalysisResult result) {
         int fileCount = result.getTotalFiles();
         int totalLines = result.getTotalLines();
@@ -246,36 +156,10 @@ public class Report {
                 t("report.summary.score"), score);
     }
 
-    private String renderVerboseInfo(AnalysisResult result) {
-        return String.format(Locale.ROOT, "%s: %d, %s: %d",
-                t("report.verbose.metrics"), result.getMetrics().size(),
-                t("report.verbose.files"), result.getFilesAnalyzed().size());
-    }
-
     private String renderVerboseInfoMarkdown(AnalysisResult result) {
         return String.format(Locale.ROOT, "- %s: %d\n- %s: %d",
                 t("report.verbose.metrics"), result.getMetrics().size(),
                 t("report.verbose.files"), result.getFilesAnalyzed().size());
-    }
-
-    private List<String> takeIssues(List<Issue> issues, int maxIssues) {
-        if (issues == null || issues.isEmpty()) return List.of(t("report.issues.none"));
-        int takeCount = Math.min(Math.max(1, maxIssues), issues.size());
-        // 截取前N个问题并转换为字符串（基于Issue的message属性，可根据需要调整格式）
-        return issues.subList(0, takeCount).stream()
-                .map(issue -> {
-                    // 构建包含关键信息的字符串，可根据需求调整格式
-                    String file = issue.getFile() != null ? issue.getFile() : "未知文件";
-                    Integer line = issue.getLine();
-                    String lineStr = line != null ? String.valueOf(line) : "未知行号";
-                    return String.format("[%s] %s:%s - %s",
-                            issue.getSeverity(), file, lineStr, issue.getMessage());
-                })
-                .collect(Collectors.toCollection(ArrayList::new));
-    }
-
-    private String sectionTitle(String text) {
-        return "== " + text + " ==";
     }
 
     private double clamp01(double v) {
@@ -293,28 +177,17 @@ public class Report {
         return current;
     }
 
-    private String scoreComment(double percentScore) {
-        if (percentScore >= 90) return t("report.score.excellent");
-        if (percentScore >= 80) return t("report.score.good");
-        if (percentScore >= 60) return t("report.score.average");
-        return t("report.score.poor");
-    }
-
     private String nullSafe(String s) {
         return s == null ? "" : s;
     }
 
-    private String emoji(String s) {
-        return s;
-    }
-
-    private String maybeColorize(String s, boolean useColor) {
-        return s; // 控制台颜色按需后续扩展
-    }
-
     private String escapeMd(String s) {
         if (s == null) return "";
-        return s.replace("|", "\\|");
+        return s.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("|", "\\|")
+                .replace("`", "\\`");
     }
 
     private String t(String key, Object... args) {

@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -592,7 +593,7 @@ public abstract class Analyzer {
                 if (parseResult.getLanguage() == com.diagnostician.service.model.common.LanguageType.JAVA) {
                     ASTParser jdt = ASTParser.newParser(AST.JLS21);
                     jdt.setKind(ASTParser.K_COMPILATION_UNIT);
-                    jdt.setSource(new String(content).toCharArray());
+                    jdt.setSource(new String(content, StandardCharsets.UTF_8).toCharArray());
                     jdt.setResolveBindings(false);
                     cu = (CompilationUnit) jdt.createAST(null);
                     if (cu != null) {
@@ -624,8 +625,17 @@ public abstract class Analyzer {
                 result.setParseResult(parseResult);
 
                 for (com.diagnostician.service.model.metric.Metric metric : metricFactory.createAllMetrics()) {
-                    com.diagnostician.service.model.metric.MetricResult mr = metric.analyze(parseResult);
-                    result.addMetricResult(metric.getName(), mr);
+                    try {
+                        com.diagnostician.service.model.metric.MetricResult mr = metric.analyze(parseResult);
+                        result.addMetricResult(metric.getName(), mr);
+                    } catch (Exception metricEx) {
+                        result.addMetricResult(metric.getName(), new com.diagnostician.service.model.metric.MetricResult(
+                                0.0,
+                                new ArrayList<>(),
+                                metric.getDescription() + " (分析失败: " + metricEx.getMessage() + ")",
+                                metric.getWeight()
+                        ));
+                    }
                 }
                 return result;
             } catch (IOException e) {
@@ -643,9 +653,5 @@ public abstract class Analyzer {
             }
             return count == 0 ? 0.0 : total / count;
         }
-    }
-    // min 返回两个整数中较小的一个
-    private static int min(int a, int b) {
-        return Math.min(a, b);
     }
 }

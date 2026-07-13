@@ -9,6 +9,7 @@ export class WebSocketManager {
     this.reconnectInterval = 3000
     this.handlers = new Map()
     this.heartbeatInterval = null
+    this.reconnectTimer = null
     this.isManualClose = false
   }
 
@@ -16,7 +17,6 @@ export class WebSocketManager {
     try {
       this.ws = new WebSocket(this.url)
       this.setupEventListeners()
-      this.startHeartbeat()
     } catch (error) {
       console.error('WebSocket连接失败:', error)
       this.reconnect()
@@ -28,6 +28,7 @@ export class WebSocketManager {
       console.log('WebSocket连接已建立')
       this.reconnectAttempts = 0
       this.isManualClose = false
+      this.startHeartbeat()
     }
 
     this.ws.onmessage = (event) => {
@@ -65,7 +66,6 @@ export class WebSocketManager {
       }
     })
 
-    // 触发通用消息处理器
     const allHandlers = this.handlers.get('*') || []
     allHandlers.forEach(handler => {
       try {
@@ -102,11 +102,12 @@ export class WebSocketManager {
   }
 
   startHeartbeat() {
+    this.stopHeartbeat()
     this.heartbeatInterval = setInterval(() => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.send({ type: 'ping' })
       }
-    }, 30000) // 30秒发送一次心跳
+    }, 30000)
   }
 
   stopHeartbeat() {
@@ -119,7 +120,7 @@ export class WebSocketManager {
   reconnect() {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++
-      setTimeout(() => {
+      this.reconnectTimer = setTimeout(() => {
         console.log(`WebSocket重连尝试 ${this.reconnectAttempts}/${this.maxReconnectAttempts}`)
         this.connect()
       }, this.reconnectInterval)
@@ -131,6 +132,11 @@ export class WebSocketManager {
   disconnect() {
     this.isManualClose = true
     this.stopHeartbeat()
+
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
 
     if (this.ws) {
       this.ws.close()
@@ -160,7 +166,6 @@ export function useWebSocket(projectId) {
     wsManager.value = new WebSocketManager(wsUrl)
     wsManager.value.connect()
 
-    // 监听连接状态变化
     wsManager.value.subscribe('*', () => {
       isConnected.value = wsManager.value.isConnected()
     })
@@ -191,7 +196,6 @@ export function useWebSocket(projectId) {
     }
   }
 
-  // 组件卸载时自动断开连接
   onUnmounted(() => {
     disconnect()
   })

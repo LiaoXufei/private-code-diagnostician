@@ -1,5 +1,5 @@
 <template>
-  <a-card class="project-card" :hoverable="true">
+  <a-card class="project-card" :hoverable="true" @click="handleCardClick">
     <template #cover>
       <div class="project-cover">
         <div class="project-icon">
@@ -16,7 +16,7 @@
         <ExperimentOutlined @click.stop="handleAnalyze" />
       </a-tooltip>
       <a-dropdown>
-        <MoreOutlined />
+        <MoreOutlined @click.stop />
         <template #overlay>
           <a-menu>
             <a-menu-item key="view" @click="handleView">
@@ -102,6 +102,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 import {
   EditOutlined,
   ExperimentOutlined,
@@ -255,6 +256,16 @@ const handleView = () => {
 
   // 同时也触发事件给父组件
   emit('view', props.project)
+}
+
+// 点击卡片主体：有分析结果则直接进入报告页；否则引导去分析页，避免报告页因无数据报错
+const handleCardClick = () => {
+  if (props.project.lastAnalysis) {
+    router.push(`/project/${props.project.id}/report`)
+  } else {
+    message.info('该项目暂无分析结果，请先上传代码并执行分析')
+    router.push(`/project/${props.project.id}/analysis`)
+  }
 }
 </script>
 

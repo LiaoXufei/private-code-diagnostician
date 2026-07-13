@@ -23,6 +23,16 @@
         <a-col :span="18">
           <a-card title="七维度雷达图" class="radar-card">
             <div ref="radarChartRef" class="radar-chart-container"></div>
+            <div
+              v-if="radarTooltip.visible"
+              class="radar-tooltip"
+              :style="{ left: radarTooltip.x + 'px', top: radarTooltip.y + 'px' }"
+            >
+              <div class="radar-tooltip-title">{{ radarTooltip.name }}</div>
+              <div class="radar-tooltip-row">当前分数: <b>{{ radarTooltip.score }}</b> 分</div>
+              <div class="radar-tooltip-row">满分: {{ radarTooltip.maxScore }} 分</div>
+              <div class="radar-tooltip-row">问题数: {{ radarTooltip.issues }} 个</div>
+            </div>
           </a-card>
         </a-col>
       </a-row>
@@ -199,8 +209,19 @@
           <a-card title="快速操作" class="actions-card">
             <div class="action-buttons">
               <a-space direction="vertical" style="width: 100%">
-                <!-- AI 优化建议入口暂隐藏（功能为占位，避免误导） -->
-                <a-button type="primary" block @click="exportReport('md')">
+                <a-button type="primary" block @click="goToOptimize">
+                  <BulbOutlined />
+                  AI 优化建议
+                </a-button>
+                <a-button block @click="goToChat">
+                  <MessageOutlined />
+                  AI 代码对话
+                </a-button>
+                <a-button block @click="goToAgent">
+                  <RobotOutlined />
+                  AI Agent 诊断
+                </a-button>
+                <a-button block @click="exportReport('md')">
                   <FileTextOutlined />
                   导出Markdown报告
                 </a-button>
@@ -223,6 +244,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { useProjectStore } from '@/stores/project'
 import { projectApi } from '@/api/project'
+import { buildAuthHeaders } from '@/api/request'
 import * as echarts from 'echarts'
 import {
   BarChartOutlined,
@@ -230,9 +252,10 @@ import {
   FileTextOutlined,
   TableOutlined,
   RedoOutlined,
-  BulbOutlined
+  BulbOutlined,
+  MessageOutlined,
+  RobotOutlined
 } from '@ant-design/icons-vue'
-// BulbOutlined 仍用于问题列表等展示，AI 优化跳转已移除
 import ScoreCard from '@/components/common/ScoreCard.vue'
 
 const route = useRoute()
@@ -248,6 +271,8 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const radarChartRef = ref(null)
 const radarChart = ref(null)
+// 自定义雷达图扇区悬停浮层（不依赖 echarts 内置 tooltip 触发）
+const radarTooltip = ref({ visible: false, x: 0, y: 0, name: '', score: 0, maxScore: 100, issues: 0 })
 
 const dimensionTypeMap = {
   // 后端维度名称
@@ -442,39 +467,46 @@ const handleFileClick = (file) => {
   message.info(`点击了文件: ${getFileName(file.file)}`)
 }
 
-const exportReport = (format) => {
+const exportReport = async (format) => {
   const projectId = route.params.id
   if (!projectId) {
     message.error('项目ID不能为空')
     return
   }
-  if (format === 'pdf') {
-    const url = `/api/projects/${projectId}/report.pdf`
+  const ext = format === 'pdf' ? 'pdf' : 'md'
+  const url = `/api/projects/${projectId}/report.${ext}`
+  try {
+    const response = await fetch(url, { headers: buildAuthHeaders() })
+    if (!response.ok) {
+      message.error(`报告导出失败（${response.status}）`)
+      return
+    }
+    const blob = await response.blob()
+    const objectUrl = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url
-    a.target = '_blank'
-    a.rel = 'noopener'
-    a.download = `report-${projectId}.pdf`
+    a.href = objectUrl
+    a.download = `report-${projectId}.${ext}`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    message.success('开始下载PDF报告')
-    return
+    URL.revokeObjectURL(objectUrl)
+    message.success(`已开始下载${format === 'pdf' ? 'PDF' : 'Markdown'}报告`)
+  } catch (error) {
+    console.error('导出报告失败:', error)
+    message.error('报告导出失败，请稍后重试')
   }
-  if (format === 'md') {
-    const url = `/api/projects/${projectId}/report.md`
-    const a = document.createElement('a')
-    a.href = url
-    a.target = '_blank'
-    a.rel = 'noopener'
-    a.download = `report-${projectId}.md`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    message.success('开始下载Markdown报告')
-    return
-  }
-  message.info('暂未支持的导出格式')
+}
+
+const goToOptimize = () => {
+  router.push(`/project/${route.params.id}/optimize`)
+}
+
+const goToChat = () => {
+  router.push(`/project/${route.params.id}/chat`)
+}
+
+const goToAgent = () => {
+  router.push(`/project/${route.params.id}/agent`)
 }
 
 const reanalyze = () => {
@@ -499,22 +531,21 @@ const reanalyze = () => {
   }
 }
 
+const handleRadarResize = () => {
+  radarChart.value?.resize()
+}
+
 // 雷达图相关方法
 const initRadarChart = () => {
   if (!radarChartRef.value) return
 
-  // 销毁已存在的图表实例
   if (radarChart.value) {
+    teardownRadarHover(radarChart.value)
     radarChart.value.dispose()
   }
 
-  // 创建新的图表实例
   radarChart.value = echarts.init(radarChartRef.value)
-
-  // 监听窗口大小变化，调整图表大小
-  window.addEventListener('resize', () => {
-    radarChart.value?.resize()
-  })
+  window.addEventListener('resize', handleRadarResize)
 }
 
 const updateRadarChart = () => {
@@ -534,11 +565,9 @@ const updateRadarChart = () => {
       }
     },
     tooltip: {
-      trigger: 'item',
-      formatter: (params) => {
-        const dimension = dimensions[params.dataIndex]
-        return `${dimension.name}<br/>分数: ${dimension.score}分<br/>满分: ${dimension.maxScore}分<br/>问题数: ${dimension.issues}个`
-      }
+      // 扇区悬停使用自定义浮层（见 setupRadarHover），禁用内置 tooltip 避免重复
+      trigger: 'none',
+      confine: true
     },
     legend: {
       data: ['当前分数', '满分'],
@@ -622,6 +651,99 @@ const updateRadarChart = () => {
   }
 
   radarChart.value.setOption(option)
+
+  // 挂接原生鼠标事件：按鼠标所在扇区定位维度，显示自定义浮层
+  setupRadarHover(radarChart.value, dimensions)
+}
+
+// 雷达图扇区悬停：鼠标移动到某个维度扇区时显示该维度详情
+const setupRadarHover = (chart, dimensions) => {
+  if (!chart || !dimensions.length) return
+
+  const zr = chart.getZr()
+  // 雷达中心与半径百分比，需与 option.radar 保持一致
+  const centerPct = [0.5, 0.55]
+  const radiusPct = 0.65
+  const n = dimensions.length
+  // 每个扇区的角度跨度（弧度）；ECharts 雷达第一个维度从右侧 0° 开始，逆时针布置
+  const sector = (Math.PI * 2) / n
+  let lastIdx = -1
+
+  const onMove = (e) => {
+    const w = chart.getWidth()
+    const h = chart.getHeight()
+    const cx = w * centerPct[0]
+    const cy = h * centerPct[1]
+    const radius = Math.min(w, h) * radiusPct
+    // zr 事件 target 为 canvas，offsetX/Y 即 canvas 内像素坐标
+    const px = e.offsetX == null ? (e.event && e.event.offsetX) : e.offsetX
+    const py = e.offsetY == null ? (e.event && e.event.offsetY) : e.offsetY
+    const dx = px - cx
+    const dy = py - cy
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    // 超出雷达外接圆一定范围则隐藏（给容差，便于在顶点附近命中）
+    if (dist > radius * 1.15) {
+      hideRadarTooltip()
+      return
+    }
+    // 计算角度并归一化到 [0, 2π)
+    let angle = Math.atan2(dy, dx)
+    if (angle < 0) angle += Math.PI * 2
+    // 维度 i 的角度为 -i*sector（逆时针），等价于 2π - i*sector
+    const idx = Math.round(angle / sector) % n
+    if (idx !== lastIdx) {
+      lastIdx = idx
+      const dim = dimensions[idx]
+      if (dim) showRadarTooltip(dim, px, py)
+    } else {
+      // 同一扇区内移动，仅跟随鼠标位置
+      moveRadarTooltip(px, py)
+    }
+  }
+
+  const onOut = () => {
+    hideRadarTooltip()
+    lastIdx = -1
+  }
+
+  zr.on('mousemove', onMove)
+  zr.on('mouseout', onOut)
+
+  chart.__radarHoverMove = onMove
+  chart.__radarHoverOut = onOut
+}
+
+const showRadarTooltip = (dim, x, y) => {
+  radarTooltip.value = {
+    visible: true,
+    x: x + 14,
+    y: y + 14,
+    name: dim.name,
+    score: dim.score,
+    maxScore: dim.maxScore,
+    issues: dim.issues
+  }
+}
+
+const moveRadarTooltip = (x, y) => {
+  radarTooltip.value = { ...radarTooltip.value, x: x + 14, y: y + 14 }
+}
+
+const hideRadarTooltip = () => {
+  if (radarTooltip.value.visible) {
+    radarTooltip.value = { ...radarTooltip.value, visible: false }
+  }
+}
+
+const teardownRadarHover = (chart) => {
+  if (!chart) return
+  const zr = chart.getZr && chart.getZr()
+  if (zr) {
+    if (chart.__radarHoverMove) zr.off('mousemove', chart.__radarHoverMove)
+    if (chart.__radarHoverOut) zr.off('mouseout', chart.__radarHoverOut)
+  }
+  chart.__radarHoverMove = null
+  chart.__radarHoverOut = null
 }
 
 const loadReportData = async () => {
@@ -687,14 +809,13 @@ onMounted(() => {
 onUnmounted(() => {
   // 清理图表实例
   if (radarChart.value) {
+    teardownRadarHover(radarChart.value)
     radarChart.value.dispose()
     radarChart.value = null
   }
 
   // 移除事件监听器
-  window.removeEventListener('resize', () => {
-    radarChart.value?.resize()
-  })
+  window.removeEventListener('resize', handleRadarResize)
 })
 </script>
 
@@ -740,9 +861,43 @@ onUnmounted(() => {
 }
 
 .radar-chart-container {
+  position: relative;
   width: 100%;
   height: 300px;
   min-height: 300px;
+}
+
+.radar-tooltip {
+  position: absolute;
+  z-index: 10;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #262626;
+  white-space: nowrap;
+  transition: opacity 0.1s;
+}
+
+.radar-tooltip-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #1890ff;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 4px;
+}
+
+.radar-tooltip-row {
+  color: #595959;
+}
+
+.radar-tooltip-row b {
+  color: #262626;
 }
 
 .metrics-card,

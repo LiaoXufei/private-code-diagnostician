@@ -5,6 +5,7 @@ import com.diagnostician.service.model.common.SeverityEnum;
 import com.diagnostician.service.model.parser.ParseResult;
 import org.eclipse.jdt.core.dom.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class CommentCoverageMetric extends BaseMetric implements Metric {
@@ -23,19 +24,8 @@ public class CommentCoverageMetric extends BaseMetric implements Metric {
         }
         CompilationUnit cu = astInfo.getCompilationUnit();
         String filePath = (String) cu.getProperty("filePath");
-        if (astInfo.getCompilationUnit() == null) {
-            // 创建无法解析AST的Issue
-            Issue issue = createBaseIssue(
-                    filePath,
-                    null,
-                    SeverityEnum.HIGH.getMessage(),
-                    "无法解析AST",
-                    "请检查代码语法是否正确"
-            );
-            return new MetricResult(0.0, List.of(issue), getDescription(), getWeight());
-        }
 
-        String source = new String(astInfo.getContent());
+        String source = new String(astInfo.getContent(), StandardCharsets.UTF_8);
 
         ScoreAndIssues scoreAndIssues = analyzeCommentCoverage(cu, source, filePath);
 
@@ -124,11 +114,10 @@ public class CommentCoverageMetric extends BaseMetric implements Metric {
         return new ScoreAndIssues(score, issues);
     }
 
-    // 工具方法：创建基础Issue对象
+    // 工具方法：创建基础Issue对象（注意：不要手动设置 id，
+    // Issue 主键为 @GeneratedValue，预先赋值会导致 saveAll 走 merge/UPDATE 而非 INSERT）
     private Issue createBaseIssue(String filePath, Integer line, String severity, String message, String suggestion) {
         Issue issue = new Issue();
-        issue.setId(UUID.randomUUID().toString()); // 生成UUID作为ID
-        issue.setAnalysisId(null); // 分析ID后续关联时设置
         issue.setType("comment_coverage"); // 问题类型：注释覆盖率
         issue.setSeverity(severity);
         issue.setFile(filePath);

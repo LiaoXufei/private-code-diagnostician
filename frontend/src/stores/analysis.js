@@ -15,6 +15,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const analysisHistory = ref([])
   const loading = ref(false)
   let pollTimer = null
+  let finished = false
   const pollIntervalMs = 1000
 
   // WebSocket 相关
@@ -53,6 +54,12 @@ export const useAnalysisStore = defineStore('analysis', () => {
     return { text: '不及格', color: '#f5222d', level: 'poor' }
   })
 
+  const markFinished = () => {
+    if (finished) return true
+    finished = true
+    return false
+  }
+
   // Actions
   const startAnalysis = async (projectId) => {
     if (isAnalyzing.value) {
@@ -61,6 +68,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     }
 
     loading.value = true
+    finished = false
     analysisError.value = null
 
     try {
@@ -69,7 +77,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
       analysisStatus.value = 'analyzing'
       analysisProgress.value = 0
 
-      // 建立 WebSocket 连接
       setupWebSocketConnection(projectId)
       startPolling(projectId)
 
@@ -78,7 +85,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     } catch (err) {
       analysisError.value = err.message || '启动分析失败'
       analysisStatus.value = 'error'
-      cleanupWebSocket() // 确保在失败时清理WebSocket连接
+      cleanupWebSocket()
       message.error(analysisError.value)
       throw err
     } finally {
@@ -101,7 +108,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
   }
 
   const cancelAnalysis = async (projectId) => {
-    // 如果没有正在分析的任务，直接提示用户
     if (!isAnalyzing.value) {
       message.info('当前没有正在进行的分析任务')
       return
@@ -111,6 +117,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
 
     try {
       await analysisApi.cancelAnalysis(projectId).catch(() => ({ data: { status: 'cancelled' } }))
+      if (markFinished()) return
       analysisStatus.value = 'cancelled'
       stopPolling()
       cleanupWebSocket()
@@ -142,16 +149,16 @@ export const useAnalysisStore = defineStore('analysis', () => {
   }
 
   const completeAnalysis = (result) => {
+    if (markFinished()) return
     analysisStatus.value = 'completed'
     analysisProgress.value = 100
     reportData.value = result
 
-    // 添加到历史记录
     analysisHistory.value.unshift({
       taskId: currentTaskId.value,
       completedAt: new Date().toISOString(),
       overallScore: result.overallScore,
-      grade: qualityGrade.value.level
+      grade: qualityGrade.value?.level || 'good'
     })
 
     cleanupWebSocket()
@@ -160,6 +167,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
   }
 
   const resetAnalysis = () => {
+    finished = false
     analysisStatus.value = 'idle'
     analysisProgress.value = 0
     currentTaskId.value = null
@@ -175,8 +183,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
 
       connect()
 
-      // 订阅分析进度
       subscribe('analysis_progress', (payload) => {
+        if (finished) return
         updateAnalysisStatus({
           progress: payload.progress,
           status: 'analyzing',
@@ -185,13 +193,12 @@ export const useAnalysisStore = defineStore('analysis', () => {
         })
       })
 
-      // 订阅分析完成
       subscribe('analysis_completed', (payload) => {
         completeAnalysis(payload.result)
       })
 
-      // 订阅分析取消（与 error 区分，避免取消被误判为失败）
       subscribe('analysis_cancelled', () => {
+        if (markFinished()) return
         analysisStatus.value = 'cancelled'
         analysisProgress.value = 0
         cleanupWebSocket()
@@ -199,17 +206,16 @@ export const useAnalysisStore = defineStore('analysis', () => {
         message.info('分析任务已取消')
       })
 
-      // 订阅分析错误
       subscribe('analysis_error', (payload) => {
+        if (markFinished()) return
         analysisStatus.value = 'error'
         analysisError.value = payload.error
         message.error(payload.error)
         cleanupWebSocket()
+        stopPolling()
       })
 
-      // 订阅连接状态变化
       subscribe('*', (data) => {
-        // 如果WebSocket连接失败且当前不是分析状态，清理连接
         if (data.type === 'connection_failed' && !isAnalyzing.value) {
           cleanupWebSocket()
         }
@@ -219,19 +225,24 @@ export const useAnalysisStore = defineStore('analysis', () => {
       wsConnected.value = true
     } catch (error) {
       console.error('WebSocket连接设置失败:', error)
-      // 如果WebSocket设置失败，不影响分析流程，只是不使用实时更新
     }
   }
 
   const startPolling = (projectId) => {
     stopPolling()
     pollTimer = setInterval(async () => {
+      if (finished) {
+        stopPolling()
+        return
+      }
       try {
         const status = await getAnalysisStatus(projectId)
         if (status.status === 'completed') {
+          if (finished) return
           const res = await projectApi.getAnalysisResult(projectId)
           completeAnalysis(res.data)
         } else if (status.status === 'error' || status.status === 'cancelled') {
+          if (markFinished()) return
           stopPolling()
           cleanupWebSocket()
         }
@@ -261,7 +272,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
   }
 
   return {
-    // State
     analysisStatus,
     analysisProgress,
     currentTaskId,
@@ -270,8 +280,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
     analysisHistory,
     loading,
     wsConnected,
-
-    // Getters
     isAnalyzing,
     isCompleted,
     hasError,
@@ -281,8 +289,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
     hasReport,
     overallScore,
     qualityGrade,
-
-    // Actions
     startAnalysis,
     getAnalysisStatus,
     cancelAnalysis,

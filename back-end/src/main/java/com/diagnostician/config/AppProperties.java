@@ -33,6 +33,18 @@ public class AppProperties {
     }
 
     public Path resolveStoredFile(String projectId, String storedFilename) {
-        return projectDir(projectId).resolve(storedFilename);
+        if (storedFilename == null || storedFilename.isBlank()) {
+            throw new IllegalArgumentException("文件名不能为空");
+        }
+        String basename = java.nio.file.Paths.get(storedFilename).getFileName().toString();
+        if (basename.isBlank() || basename.contains("..")) {
+            throw new IllegalArgumentException("非法文件名");
+        }
+        Path base = projectDir(projectId).normalize();
+        Path resolved = base.resolve(basename).normalize();
+        if (!resolved.startsWith(base)) {
+            throw new IllegalArgumentException("非法文件路径");
+        }
+        return resolved;
     }
 }

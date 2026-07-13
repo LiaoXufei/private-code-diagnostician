@@ -5,8 +5,11 @@ import com.diagnostician.entity.*;
 import com.diagnostician.exception.AnalysisFailedException;
 import com.diagnostician.exception.ResourceNotFoundException;
 import com.diagnostician.repository.*;
+import com.diagnostician.service.ai.EmbeddingService;
 import com.diagnostician.service.model.analyzer.Analyzer;
 import jakarta.transaction.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -23,6 +26,8 @@ import java.util.stream.Collectors;
 @Service
 public class AnalysisService {
 
+    private static final Logger log = LoggerFactory.getLogger(AnalysisService.class);
+
     private final ProjectRepository projectRepository;
     private final ProjectFileRepository fileRepository;
     private final AnalysisRepository analysisRepository;
@@ -35,6 +40,7 @@ public class AnalysisService {
     private final AnalysisAsyncLauncher asyncLauncher;
     private final TransactionTemplate transactionTemplate;
     private final AppProperties appProperties;
+    private final EmbeddingService embeddingService;
 
     public AnalysisService(
             ProjectRepository projectRepository,
@@ -48,7 +54,8 @@ public class AnalysisService {
             AnalysisWebSocketHub webSocketHub,
             AnalysisAsyncLauncher asyncLauncher,
             PlatformTransactionManager transactionManager,
-            AppProperties appProperties
+            AppProperties appProperties,
+            EmbeddingService embeddingService
     ) {
         this.projectRepository = projectRepository;
         this.fileRepository = fileRepository;
@@ -62,6 +69,7 @@ public class AnalysisService {
         this.asyncLauncher = asyncLauncher;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.appProperties = appProperties;
+        this.embeddingService = embeddingService;
     }
 
     /**
@@ -72,10 +80,6 @@ public class AnalysisService {
     public Map<String, Object> startAnalysis(String projectId) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("项目不存在"));
-
-        if (progressTracker.isAnalyzing(projectId)) {
-            throw new AnalysisFailedException("该项目已有分析任务正在进行");
-        }
 
         List<ProjectFile> existingFiles = fileRepository.findByProjectId(projectId);
         if (existingFiles.isEmpty()) {
@@ -89,11 +93,13 @@ public class AnalysisService {
         analysis.setCreatedAt(Instant.now());
         Analysis savedAnalysis = analysisRepository.save(analysis);
 
+        AnalysisProgress progress = progressTracker.tryStart(projectId, savedAnalysis.getId())
+                .orElseThrow(() -> new AnalysisFailedException("该项目已有分析任务正在进行"));
+
         project.setStatus("analyzing");
         project.setUpdatedAt(Instant.now());
         projectRepository.save(project);
 
-        AnalysisProgress progress = progressTracker.start(projectId, savedAnalysis.getId());
         progress.setTotalFiles(existingFiles.size());
         progress.setStage("queued");
         progress.setMessage("分析任务已排队");
@@ -137,7 +143,7 @@ public class AnalysisService {
                 webSocketHub.send(projectId, "analysis_error", Map.of("error", e.getMessage()));
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("分析任务异常: projectId={}", projectId, e);
             String err = e.getMessage() != null ? e.getMessage() : "分析失败";
             progressTracker.fail(projectId, err);
             markProjectError(projectId);
@@ -208,7 +214,7 @@ public class AnalysisService {
                 far.setComplexity(complexity);
                 fileAnalysisResults.add(far);
             } catch (Exception e) {
-                System.err.println("[Analysis] 文件分析失败: " + f.getFilename() + " - " + e.getMessage());
+                log.warn("文件分析失败: {} - {}", f.getFilename(), e.getMessage());
                 analysisErrors.add(f.getFilename() + ": " + e.getMessage());
             }
 
@@ -297,6 +303,12 @@ public class AnalysisService {
         Map<String, Object> result = buildResultPayload(
                 projectId, completedProject, completedAnalysis, dimensions, allIssues);
         webSocketHub.send(projectId, "analysis_completed", Map.of("result", result));
+        try {
+            embeddingService.clearIndexed(projectId);
+            embeddingService.indexProject(projectId);
+        } catch (Exception ignored) {
+            // RAG 索引失败不影响主分析流程
+        }
         pushProgress(projectId, progressTracker.get(projectId).orElse(progress));
     }
 
@@ -310,10 +322,15 @@ public class AnalysisService {
             List<Issue> allIssues
     ) {
         transactionTemplate.executeWithoutResult(status -> {
-            Analysis savedAnalysis = analysisRepository.findById(analysisId)
-                    .orElseThrow(() -> new AnalysisFailedException("分析记录不存在"));
             Project project = projectRepository.findById(projectId)
                     .orElseThrow(() -> new ResourceNotFoundException("项目不存在"));
+            if ("cancelled".equals(project.getStatus())) {
+                status.setRollbackOnly();
+                return;
+            }
+
+            Analysis savedAnalysis = analysisRepository.findById(analysisId)
+                    .orElseThrow(() -> new AnalysisFailedException("分析记录不存在"));
 
             // 子实体通过 analysisId 外键独立落库；切勿对带 orphanRemoval 的集合做整表 set 替换，
             // 否则 Hibernate 会报 "collection ... was no longer referenced by the owning entity"

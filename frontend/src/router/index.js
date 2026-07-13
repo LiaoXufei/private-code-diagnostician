@@ -79,17 +79,36 @@ const routes = [
               parent: 'project'
             }
           },
-          // AI 优化建议路由暂隐藏（CodeOptimize.vue 仍为占位页）
-          // {
-          //   path: 'optimize',
-          //   name: 'CodeOptimize',
-          //   component: () => import('@/views/CodeOptimize.vue'),
-          //   meta: {
-          //     title: 'AI优化建议',
-          //     icon: 'BulbOutlined',
-          //     parent: 'project'
-          //   }
-          // },
+          {
+            path: 'optimize',
+            name: 'CodeOptimize',
+            component: () => import('@/views/CodeOptimize.vue'),
+            meta: {
+              title: 'AI优化建议',
+              icon: 'BulbOutlined',
+              parent: 'project'
+            }
+          },
+          {
+            path: 'chat',
+            name: 'AiChat',
+            component: () => import('@/views/AiChat.vue'),
+            meta: {
+              title: 'AI代码对话',
+              icon: 'MessageOutlined',
+              parent: 'project'
+            }
+          },
+          {
+            path: 'agent',
+            name: 'AiAgent',
+            component: () => import('@/views/AiAgent.vue'),
+            meta: {
+              title: 'AI Agent诊断',
+              icon: 'RobotOutlined',
+              parent: 'project'
+            }
+          },
           {
             path: 'history',
             name: 'History',

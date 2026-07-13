@@ -4,27 +4,85 @@ server:
 # 上传文件根目录（相对路径相对于进程工作目录；建议生产环境改为绝对路径）
 app:
   upload-dir: uploads
+  ai:
+    enabled: true
+    # Chat 模型提供商: openai | deepseek | qwen | ollama
+    active-provider: ${AI_PROVIDER:deepseek}
+    # Embedding 模型提供商: openrouter | openai | ollama | none
+    # 注意：DeepSeek 不提供 Embedding API，RAG 功能需要单独的 Embedding 来源
+    # - openrouter: 用 OpenRouter 提供 Embedding（可使用免费模型，需单独的 API Key）
+    # - openai: 用 OpenAI 做 Embedding（需要 OpenAI API Key）
+    # - ollama: 用本地 Ollama 做 Embedding（免费，需安装 Ollama）
+    # - none: 禁用 RAG（AI优化和Agent仍可用）
+    embedding-provider: ${EMBEDDING_PROVIDER:none}
+    openrouter-api-key: ${OPENROUTER_API_KEY:}
+    openrouter-base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api}
+    openrouter-embedding-model: ${OPENROUTER_EMBEDDING_MODEL:nvidia/llama-nemotron-embed-vl-1b-v2:free}
+    vector-store-dir: data/vectorstore
+    max-context-issues: 20
+    max-code-chars: 8000
 
 spring:
   datasource:
     url: jdbc:sqlite:springboot-sqlite-jpa.db
   jpa:
     hibernate:
-      ddl-auto: update # 启动时自动建表/更新表结构
-    show-sql: true # 打印SQL日志（调试用）
+      ddl-auto: update
+    show-sql: true
     properties:
       hibernate:
-        format_sql: false # 格式化SQL
-        dialect: org.hibernate.community.dialect.SQLiteDialect # SQLite 方言
+        format_sql: false
+        dialect: org.hibernate.community.dialect.SQLiteDialect
         jdbc:
-          batch_size: 10 # 批量操作优化
+          batch_size: 10
 
   servlet:
     multipart:
       max-file-size: 10MB
       max-request-size: 50MB
 
+  ai:
+    model:
+      chat: openai
+      embedding: openai
+    openai:
+      api-key: ${OPENAI_API_KEY:sk-placeholder}
+      base-url: ${OPENAI_BASE_URL:https://api.deepseek.com}
+      chat:
+        options:
+          model: ${OPENAI_CHAT_MODEL:deepseek-chat}
+          temperature: 0.3
+      embedding:
+        options:
+          model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      chat:
+        options:
+          model: ${OLLAMA_CHAT_MODEL:llama3.2}
+      embedding:
+        options:
+          model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+    vectorstore:
+      simple:
+        initialize-schema: true
+    mcp:
+      server:
+        enabled: true
+        name: code-diagnostician-mcp
+        version: 1.0.0
+        type: SYNC
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    tags:
+      application: code-diagnostician
+
 logging:
   level:
     org.springframework.data.jpa: INFO
-#    com.diagnostician: DEBUG
+    org.springframework.ai: INFO

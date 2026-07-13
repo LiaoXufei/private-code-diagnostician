@@ -15,10 +15,34 @@ public class AnalysisProgressTracker {
 
     private final Map<String, AnalysisProgress> progressByProject = new ConcurrentHashMap<>();
 
-    public AnalysisProgress start(String projectId, String analysisId) {
+    /**
+     * 原子尝试启动分析任务；若已有 analyzing 状态的任务则返回 empty。
+     */
+    public Optional<AnalysisProgress> tryStart(String projectId, String analysisId) {
         AnalysisProgress progress = new AnalysisProgress(projectId, analysisId);
-        progressByProject.put(projectId, progress);
-        return progress;
+        while (true) {
+            AnalysisProgress existing = progressByProject.get(projectId);
+            if (existing != null && "analyzing".equals(existing.getStatus())) {
+                return Optional.empty();
+            }
+            if (existing == null) {
+                if (progressByProject.putIfAbsent(projectId, progress) == null) {
+                    return Optional.of(progress);
+                }
+                continue;
+            }
+            if (progressByProject.replace(projectId, existing, progress)) {
+                return Optional.of(progress);
+            }
+        }
+    }
+
+    public AnalysisProgress start(String projectId, String analysisId) {
+        return tryStart(projectId, analysisId).orElseGet(() -> {
+            AnalysisProgress p = new AnalysisProgress(projectId, analysisId);
+            progressByProject.put(projectId, p);
+            return p;
+        });
     }
 
     public Optional<AnalysisProgress> get(String projectId) {
@@ -54,6 +78,7 @@ public class AnalysisProgressTracker {
         progress.setStage("done");
         progress.setMessage("分析完成");
         progress.setUpdatedAt(Instant.now());
+        progressByProject.remove(projectId);
     }
 
     public void fail(String projectId, String error) {
@@ -66,6 +91,7 @@ public class AnalysisProgressTracker {
         progress.setStage("error");
         progress.setMessage(error);
         progress.setUpdatedAt(Instant.now());
+        progressByProject.remove(projectId);
     }
 
     public void cancel(String projectId) {
@@ -78,6 +104,7 @@ public class AnalysisProgressTracker {
         progress.setStage("cancelled");
         progress.setMessage("分析已取消");
         progress.setUpdatedAt(Instant.now());
+        progressByProject.remove(projectId);
     }
 
     public void requestCancel(String projectId) {
